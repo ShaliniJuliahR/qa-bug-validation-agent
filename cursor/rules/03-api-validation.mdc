@@ -1,0 +1,215 @@
+---
+description: Handles all API bug validation using the Postman MCP and direct API calls. Triggered when the Jira orchestrator classifies a ticket as API or Both. Fetches Postman collections, confirms request details with the user, executes calls, and displays full responses. Returns pass/fail results to the orchestrator.
+alwaysApply: false
+---
+
+# API Validation — Postman MCP
+
+> **Primary flow:** `01-jira-orchestrator.mdc` — this file runs only for **Phase 3** when classification is **API** or **Both**.
+
+---
+
+## PHASE 3-B — API Validation
+
+### Step 1: Identify Collection and Environment
+
+Check the ticket description and labels for any mention of a Postman collection or target environment.
+
+If either is unclear or not mentioned, ask the user before proceeding.
+
+If the Postman MCP returns a **finite list** of collections or environments, show each as a **numbered line**; the user replies with the number(s). Otherwise use:
+
+```
+Before API validation, I need:
+
+Collection: [which Postman collection?]
+Environment: [DEV / QA / Staging / …]
+
+Choose:
+1. I'll reply with collection name + environment in my next message
+2. List available collections/environments from Postman (if MCP supports it)
+```
+
+Wait until you have both collection and environment (by number pick or explicit names). Do not proceed to any API fetch or call without both confirmed.
+
+---
+
+### Step 2: Fetch API Details from Postman
+
+Using the Postman MCP, fetch:
+- The specified collection
+- The relevant endpoint(s) related to the bug described in the ticket
+- For each endpoint, extract:
+  - Full URL (with environment base URL applied)
+  - HTTP Method
+  - Request Headers
+  - Request Body / Query Parameters
+  - Authentication type and token location
+
+---
+
+### Step 3: Consolidate P1 Test Cases
+
+If the ticket requires validation of multiple endpoints or scenarios, identify and present only **P1 (Primary / Critical) cases** — the minimum set that directly validates the bug fix.
+
+```
+=== P1 TEST CASES FOR VALIDATION ===
+
+  Case 1: [Test Case Name]
+    Endpoint: [METHOD] [Full URL]
+    Purpose:  [What this validates in relation to the bug]
+
+  Case 2: [Test Case Name]
+    Endpoint: [METHOD] [Full URL]
+    Purpose:  [What this validates in relation to the bug]
+
+(Non-P1 cases have been excluded from this validation run.)
+
+Choose:
+1. Proceed with these P1 cases
+2. I will correct the case list (reply with changes)
+```
+
+Do not proceed until the user chooses **1** (or unambiguous **CONFIRM** mapped to proceed).
+
+---
+
+### Step 4: Confirm Full Request Details Per Case
+
+For each confirmed test case, present the complete request details for user review before executing:
+
+```
+=== API CALL CONFIRMATION — Case [N]: [Test Case Name] ===
+
+Method:       [GET / POST / PUT / PATCH / DELETE]
+URL:          [Full resolved URL]
+Environment:  [ENV Name]
+Headers:      [Key: Value]
+              [Key: Value]
+Payload:      [Request body or query params — formatted clearly]
+Auth:         [Auth type — Bearer Token / API Key / Basic Auth / None]
+              [Token source — e.g., "token to be provided by user" or "pulled from Postman env variable"]
+
+If auth credentials are needed, ask for them in the same turn or before execution.
+
+Choose:
+1. Execute this call
+2. I will correct the request (reply with changes)
+```
+
+- If credentials or tokens are required and not available in the Postman environment, ask the user to supply them explicitly at this step.
+- Never assume or fabricate auth tokens.
+
+---
+
+### Step 5: Execute API Calls
+
+Execute each confirmed call directly using the Postman MCP or direct API call — no scripting.
+
+For each call, display the **full response immediately** after execution so the user can review it:
+
+```
+=== RESPONSE: Case [N] — [Test Case Name] ===
+
+Status Code:    [e.g., 200 OK / 400 Bad Request / 401 Unauthorized / 500 Internal Server Error]
+Response Time:  [ms]
+Response Body:
+{
+  [Full response body displayed here — do not truncate]
+}
+
+Observation: [Agent's interpretation — does this response indicate the bug is fixed? Note any unexpected fields, status codes, or error messages.]
+
+Choose:
+1. Continue to next case
+2. Stop here (discuss this response)
+```
+
+If the user chose **one-at-a-time** review at the start of Step 5, after each response wait until they pick **1** or **2** before the next call. If they chose **run all**, skip the per-response **Choose** block until the final summary (or only on error).
+
+Clarify review preference at the start of Step 5 (before the first execution):
+
+```
+Choose:
+1. Show each response one at a time — wait for my reply before the next call
+2. Run all cases — show the full summary at the end
+```
+
+---
+
+### Step 6: Handle Errors, Blocks, and Missing Verdicts During Execution
+
+#### Blocked before a pass/fail verdict
+
+If you **cannot execute** a P1 case or **cannot interpret** the response in relation to the bug **yet** — e.g. Postman MCP unavailable, collection/env missing, auth token absent, **401/403 before any business response**, connection refused, wrong base URL, prerequisite call not done:
+
+- **Do not** conclude that the bug **passed** or **failed** — treat as **indeterminate / blocked** until a valid validation response exists.
+- State which **validation point** was not reached (which case, which endpoint, what was missing).
+- **Ask the user how to resolve the block** so execution can reach that point (supply env, token, collection name, VPN, order of calls, etc.). Wait for explicit direction; do not fabricate secrets.
+
+#### Unexpected errors after a call is executed
+
+If an API call returns an unexpected error (e.g., 500, connection refused, auth failure, timeout) **and** you still cannot judge the bug fix from the outcome:
+
+1. **Stop execution of remaining cases.**
+2. Report the error clearly:
+   ```
+   ❌ Case [N] Error
+   Endpoint: [METHOD] [URL]
+   Status:   [Code + message]
+   Body:     [Error response body]
+   Likely Cause: [e.g., Invalid auth token / Environment URL misconfigured / Endpoint not deployed to this env]
+   ```
+3. Ask how to proceed with a minimal numbered list. If the error means **no pass/fail verdict** is possible yet, say so and prioritize options that **unblock** the validation point:
+   ```
+   Choose:
+   1. Retry with corrected parameters (I'll provide details)
+   2. Skip this case and continue
+   3. Abort API validation
+   ```
+
+> ⚠️ Also refer to `self-improvement-api.mdc` — if the error was caused by a faulty guideline in this file, update that file after resolving the issue.
+
+---
+
+### Step 7: API Validation Summary
+
+After all cases are executed and reviewed, present the consolidated results:
+
+```
+=== API VALIDATION RESULTS ===
+
+Environment: [ENV Name]
+
+✅ / ❌  Case 1: [Name] — [METHOD] [URL] — Status [code] — [Pass / Fail]
+✅ / ❌  Case 2: [Name] — [METHOD] [URL] — Status [code] — [Pass / Fail]
+
+Overall Result: PASS ✅ / FAIL ❌ / Incomplete — blocked (no pass-fail verdict) 🔶
+```
+
+If the run ended **blocked** before a verdict on the bug, use **Incomplete — blocked** and describe what the user must supply to proceed — **do not** draft Jira wording that asserts the bug passed or failed until validation completes.
+
+Return this result summary to `01-jira-orchestrator.mdc` for use in the Jira comment draft.
+
+---
+
+## Postman MCP Tool Reference
+
+| Tool | When to Use |
+|---|---|
+| Fetch collection | Retrieve all endpoints in a named Postman collection |
+| Fetch environment | Retrieve base URLs and env variables for a named environment |
+| Execute request | Run a specific request from a collection against a target environment |
+
+---
+
+## Guardrails
+
+- Never generate API test scripts, code, or automation files of any kind.
+- Never execute an API call before the user has confirmed the full request details.
+- Never fabricate or assume auth tokens — always ask the user if credentials are missing.
+- Always display the full response body — do not truncate or summarise it.
+- Always stop and report on error — never silently skip a failed call.
+- Limit test cases to P1 scope only — do not expand without explicit user instruction.
+- If the Postman MCP is unavailable, report it immediately and halt — do not attempt workarounds.
+- If blocked before a validation verdict, ask the user how to resolve the block; do not assert PASS/FAIL for the bug.

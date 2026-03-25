@@ -1,0 +1,197 @@
+---
+description: Handles all UI bug validation using Playwright MCP. Triggered when the Jira orchestrator classifies a ticket as UI or Both. Performs browser navigation, form interactions, and screenshot capture. Returns pass/fail results back to the orchestrator.
+alwaysApply: false
+---
+
+# UI Validation — Playwright MCP
+
+> **Primary flow:** `01-jira-orchestrator.mdc` — this file runs only for **Phase 3** when classification is **UI** or **Both**.
+
+---
+
+## PHASE 3-A — UI Validation
+
+### Step 1: Draft the Validation Checklist
+
+Based on the ticket's steps to reproduce and description, draft two things:
+
+1. **Browser steps the agent will perform** — a numbered list of specific actions
+2. **Screenshot / Validation Points** — the exact moments where evidence must be captured
+
+**Authentication (Trimble / checkout / SSO):** When the flow hits a **sign-in gate**, the agent must **not** stop indefinitely. Use this order:
+
+1. **Environment variables (default for all UI runs on this project)** — Read from the workspace **`.env`** file (or process env if already loaded):
+   - `TRIMBLE_QA_UI_EMAIL`
+   - `TRIMBLE_QA_UI_PASSWORD`  
+   Use these values only for **QA/staging** UI validation. **Do not** paste the password into Jira, chat summaries, or screenshots; refer to “signed in with configured QA account” when documenting.
+   - **Checkout card payment (when the flow requires a card in an embedded payment frame):** Prefer `TRIMBLE_QA_PAYMENT_*` from `.env` if set (`TRIMBLE_QA_PAYMENT_CARD_NUMBER`, `TRIMBLE_QA_PAYMENT_CARD_EXP_MM`, `TRIMBLE_QA_PAYMENT_CARD_EXP_YYYY`, `TRIMBLE_QA_PAYMENT_CARD_CVC`, optional `TRIMBLE_QA_PAYMENT_NAME_ON_CARD`). If unset, use **processor-approved QA test PANs** only when your team allows it; otherwise ask the user once for test card details to store in `.env`. **Never** paste full card numbers or CVC into Jira or public chat—redact in evidence (e.g. “card ending 4242”).
+2. **If either variable is missing or empty** — Ask the user once for **email and password** (or confirm they will sign in manually and say when to continue). **Do not** invent credentials.
+3. **Include auth in the written plan** — When sign-in is expected, list an explicit step such as: *Sign in via Trimble Identity using QA credentials from env (or user-supplied)*, then continue repro steps.
+
+Present the plan to the user before taking any action:
+
+```
+=== UI VALIDATION PLAN ===
+
+Environment: [ENV Name + Base URL]
+
+🔹 Steps to Perform:
+  1. Navigate to [full URL]
+  2. [Action — e.g., Sign in via Trimble Identity using TRIMBLE_QA_UI_* from .env, or ask user for creds if unset]
+  3. [Action — e.g., Navigate to [Module / Page]]
+  4. [Action — e.g., Click [Button / Element name]]
+  5. [Action — e.g., Enter [value] into [field name]]
+  ... (P1 steps only)
+
+📸 Screenshot / Validation Points:
+  - After Step [N]: Capture [what should be visible — e.g., success state, error message, correct data]
+  - After Step [N]: Capture [expected outcome or UI state]
+
+Choose:
+1. Proceed with this plan
+2. I will correct the plan (reply with changes)
+```
+
+---
+
+### Step 2: Await User Confirmation
+
+- If the user chooses **2** (or sends corrections without a number), update the checklist and re-present the full updated plan with the same **Choose:** block.
+- **Do not execute any browser action until the user chooses `1`** (or sends an unambiguous **CONFIRM** / **proceed** that maps to option 1).
+
+---
+
+### Step 3: Pre-Execution Setup
+
+Before beginning navigation:
+
+1. Create the screenshots folder for this ticket if it does not already exist:
+   ```
+   /screenshots/[JIRA_TICKET_ID]/
+   ```
+2. Confirm the folder is ready before proceeding to browser actions.
+
+---
+
+### Step 4: Execute Browser Actions via Playwright MCP
+
+Execute each confirmed step in order using the following Playwright MCP tool calls:
+
+| Action | Playwright MCP Tool |
+|---|---|
+| Navigate to a URL | `playwright_navigate` |
+| Click an element or button | `playwright_click` |
+| Enter text into a field | `playwright_fill` |
+| Wait for an element to appear | `playwright_wait_for_selector` |
+| Take a screenshot | `playwright_screenshot` |
+
+**Naming convention for screenshots:**
+```
+/screenshots/[JIRA_TICKET_ID]/step_[N]_[short_description].png
+```
+Example: `/screenshots/PROJ-412/step_5_error_message_visible.png`
+
+**Rules during execution:**
+- Execute steps sequentially — do not skip or reorder.
+- At every defined screenshot/validation point, take the screenshot immediately before moving to the next step.
+- If a step fails (element not found, navigation error, unexpected state), first follow **When the target is not visible or click fails** below; if recovery does not fix the issue, stop and report the failure — do not attempt to continue past a broken step.
+
+#### When the target is not visible or click fails
+
+If `playwright_click` fails, the selector is missing, or the button/control is **not visible** (obscured, off-screen, wrong layer):
+
+1. **Capture a screenshot** of the current page and **analyze it** — identify blockers such as modals, cookie/consent banners, drawers, loading overlays, a **new tab or popup** that stole focus, or an unexpected page (404, login gate, intermediate screen).
+2. **Recover context**, then **retry the same click step once** (or re-wait for the selector if appropriate):
+   - **Modal / popup / dialog:** Close or dismiss it (close control, “Cancel”, or equivalent MCP action); complete any required field only if the ticket’s flow demands it.
+   - **Wrong tab or extra window:** Use tab/window listing and MCP tools to **switch to the correct tab** or **close** a stray popup tab/window if that restores the intended page.
+   - **Wrong page or accidental navigation:** Use **back** navigation or **re-navigate** to the URL from the validation plan, then proceed toward the target again.
+   - **Banner / overlay blocking clicks:** Dismiss or accept per environment policy so the underlying UI is reachable.
+   - **Element below the fold or clipped:** Scroll the target into view using whatever scroll or interaction helpers the Playwright MCP exposes, then retry.
+3. If the target is still not clickable or missing after recovery, **stop** and report per **Playwright MCP tool errors** in Step 5 (include the screenshot path used for analysis).
+
+---
+
+### Step 5: Handle Errors and Blocks During Execution
+
+#### Blocked before a pass/fail verdict
+
+If the run is **stopped or cannot continue** for any reason **before** the checklist reaches a **validation point** where the bug fix can actually be judged (e.g. sign-in / MFA / SSO gate, missing permissions, VPN or network restriction, wrong environment, empty cart, modal or cookie wall, feature unavailable, missing test data):
+
+- **Do not** conclude that the bug **passed** or **failed** — the outcome is **indeterminate** until that evidence exists.
+- **Stop** and report what blocked progress and **which validation point** (screenshot / assertion step) was **not** reached.
+- **Resolve auth blocks** by using **`TRIMBLE_QA_UI_EMAIL` / `TRIMBLE_QA_UI_PASSWORD`** from `.env` when present; otherwise **ask the user** for credentials or manual sign-in. Do not guess credentials; do not bypass MFA or security policies—if MFA blocks automation, ask the user to complete it and say when to continue.
+- For **non-auth** blocks (VPN, wrong env, missing data), **ask the user** how to proceed (alternate URL, pre-seed data, etc.).
+- Resume only after the user gives a workable resolution or agrees to **abort** the UI validation run.
+
+#### Playwright MCP tool errors
+
+If a Playwright MCP error is encountered during any step:
+
+1. **Stop execution immediately.**
+2. Report the error in this format:
+   ```
+   ❌ Step [N] Failed
+   Action:  [What was attempted]
+   Error:   [Exact error message from Playwright MCP]
+   Impact:  [Steps that could not be completed as a result]
+   ```
+3. Suggest a likely cause if identifiable (e.g., selector not found, page did not load, authentication failed).
+4. Ask how to proceed using a minimal numbered list. If the error prevented reaching a **validation point** where pass/fail is known, prioritize options that **unblock progress toward that point** (not only “skip” — skipping may leave the bug unjudged; say so if applicable):
+   ```
+   Choose:
+   1. Retry this step (I will adjust and retry)
+   2. Skip this step and continue
+   3. Abort UI validation
+   ```
+
+> ⚠️ Also refer to `self-improvement-ui.mdc` — if the error was caused by a faulty guideline in this file, update that file accordingly after resolving the issue.
+
+---
+
+### Step 6: Post-Execution Report
+
+After all steps are complete, present the full results:
+
+```
+=== UI VALIDATION RESULTS ===
+
+Environment: [ENV Name]
+
+✅ / ❌  Step 1: [Action performed] — [Pass / Fail + brief observation]
+✅ / ❌  Step 2: [Action performed] — [Pass / Fail + brief observation]
+...
+
+📸 Screenshots Captured:
+  - /screenshots/[TICKET_ID]/step_3_landing_page.png
+  - /screenshots/[TICKET_ID]/step_5_error_state.png
+
+Overall Result: PASS ✅ / FAIL ❌ / Incomplete — blocked (no pass-fail verdict) 🔶
+```
+
+If the run ended **blocked** before a validation verdict, use **Incomplete — blocked** for overall result, list which evidence was missing, and return that summary to the orchestrator — **do not** draft Jira wording that claims the bug passed or failed until the user unblocks and validation completes.
+
+Return this result summary to `01-jira-orchestrator.mdc` for use in the Jira comment draft.
+
+---
+
+## Playwright MCP Tool Reference
+
+| Tool | When to Use |
+|---|---|
+| `playwright_navigate` | Load any URL in the browser |
+| `playwright_click` | Click buttons, links, checkboxes, dropdowns |
+| `playwright_fill` | Type text into input fields, text areas, search boxes |
+| `playwright_wait_for_selector` | Wait for an element before interacting with it |
+| `playwright_screenshot` | Capture the current state of the browser window |
+
+---
+
+## Guardrails
+
+- Never generate Playwright scripts, test files, or code of any kind.
+- Never begin browser actions before the user has confirmed the checklist.
+- Always create the screenshots folder before the first navigation step.
+- Always stop and report on failure — never silently skip a broken step.
+- If blocked before a validation verdict, ask the user how to resolve the block to reach that point; do not assert PASS/FAIL for the bug.
+- Screenshot filenames must be descriptive and include the step number.
+- Limit steps to P1 validation scope only — do not expand without user instruction.

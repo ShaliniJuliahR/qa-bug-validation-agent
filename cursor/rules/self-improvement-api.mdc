@@ -1,0 +1,109 @@
+---
+description: API (Postman MCP / HTTP) self-improvement for the QA Validation Agent. When an API validation error reveals a faulty guideline, append corrections here and update the source rule file. alwaysApply applies so learned API lessons are available before runs.
+alwaysApply: true
+---
+
+# Self-Improvement — API Validation
+
+## Relationship to primary orchestrator
+
+`01-jira-orchestrator.mdc` defines **how** validation runs (phases, Jira steps, handoffs). This file only governs **post-mortem updates to rules** when an **API** guideline error is identified — it does not replace or reorder orchestration.
+
+For tickets classified as **Both** (UI + API), also scan `self-improvement-ui.mdc` before and after UI-phase issues.
+
+## Purpose
+
+Errors during **API** validation are signals that a rule, assumption, or guideline may need correction. When a Postman MCP or HTTP/API error occurs during API validation, follow the protocol below.
+
+---
+
+## Error Response Protocol (API)
+
+When an **API** (Postman MCP, collection request, or related HTTP) error occurs during a validation run, the agent must:
+
+### Step 1 — Analyze the Error
+
+Do not immediately retry. First, determine the root cause:
+
+- Is this a **transient error**? (e.g., network timeout, env temporarily down) → Retry once, then escalate to the user if it persists.
+- Is this a **user input error**? (e.g., wrong collection name, wrong environment variable) → Ask the user for the correct value.
+- Is this an **environment error**? (e.g., wrong base URL, auth token expired) → Ask the user to verify and correct.
+- Is this a **guideline error**? (e.g., the rule instructed wrong request format, wrong MCP tool usage, or an assumption that does not hold) → **Proceed to Step 2.**
+
+---
+
+### Step 2 — Fix the Immediate Problem
+
+Resolve the error in the current session:
+- Correct the URL, headers, body, auth, or collection/request selection causing the failure.
+- Re-confirm with the user before retrying.
+- Document what was changed and why.
+
+---
+
+### Step 3 — Update This File If the Guideline Was Faulty
+
+If the root cause was a rule or guideline in `01-jira-orchestrator.mdc` or `03-api-validation.mdc` that was incorrect, incomplete, or produced a bad outcome:
+
+1. Identify the exact rule that caused the problem.
+2. Append a record to the **Learned Corrections** section below describing what was wrong and what the correct behaviour should be.
+3. If the faulty rule still exists in the source file, note it here so it can be reviewed and updated.
+
+> The goal is not to blame — it is to make sure the same mistake does not happen again.
+
+---
+
+## Learned Corrections (API)
+
+> This section is maintained by the agent for **API** guideline errors. Each entry is written when a guideline error is identified and resolved. Entries are never deleted — only appended.
+
+---
+
+<!-- AGENT: Append new entries below this line in the format shown. Do not edit existing entries. -->
+
+<!--
+### [DATE] — [Brief Title of the Issue]
+
+**Source File:**   [Which .mdc file contained the faulty guideline]
+**Phase:**         [Which phase the error occurred in — e.g., Phase 3-B Step 2]
+**Error:**         [What went wrong — exact error or description]
+**Root Cause:**    [Which guideline or assumption caused it]
+**Fix Applied:**   [What was changed in the current session to resolve it]
+**Rule Update:**   [What should be changed in the source file to prevent recurrence]
+
+---
+-->
+
+---
+
+## Persistent Lessons (API)
+
+> Broader **API** patterns noticed over time — not single-incident fixes. Add entries when a recurring class of problem appears (e.g. repeated auth quirks, environment naming, collection structure).
+
+---
+
+<!-- AGENT: Append broad API lessons below this line. -->
+
+---
+
+## Guidelines for Writing Good Corrections
+
+- **Be specific**: Name the exact tool call, request name, field, or assumption that failed — not just "the request failed."
+- **Be actionable**: The correction must clearly describe what should happen differently next time.
+- **Be minimal**: One entry per distinct root cause. Do not merge unrelated issues into one entry.
+- **Do not speculate**: Only record what was confirmed as the actual cause, not guesses.
+
+---
+
+## When NOT to Write a Correction (API)
+
+Do not log an entry if the failure was caused by:
+- A transient network or environment issue (not a guideline problem)
+- The user providing incorrect input (the rule itself was not at fault)
+- A known limitation of Postman MCP or the API that has already been logged in this file
+
+---
+
+## Review Reminder
+
+Before starting **API** validation (or the API portion of a **Both** ticket), briefly scan **Learned Corrections** and **Persistent Lessons** in this file — and, for **Both** tickets, the same sections in `self-improvement-ui.mdc` when entering UI work.

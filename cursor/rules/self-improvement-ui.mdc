@@ -1,0 +1,132 @@
+---
+description: UI (Playwright / browser MCP) self-improvement for the QA Validation Agent. When a UI validation error reveals a faulty guideline, append corrections here and update the source rule file. alwaysApply applies so learned UI lessons are available before runs.
+alwaysApply: true
+---
+
+# Self-Improvement — UI Validation
+
+## Relationship to primary orchestrator
+
+`01-jira-orchestrator.mdc` defines **how** validation runs (phases, Jira steps, handoffs). This file only governs **post-mortem updates to rules** when a **UI** guideline error is identified — it does not replace or reorder orchestration.
+
+For tickets classified as **Both** (UI + API), also scan `self-improvement-api.mdc` before and after API-phase issues.
+
+## Purpose
+
+Errors during **UI** validation are signals that a rule, assumption, or guideline may need correction. When a Playwright or browser MCP error occurs during UI validation, follow the protocol below.
+
+---
+
+## Error Response Protocol (UI)
+
+When a **UI** (Playwright / browser MCP) error occurs during a validation run, the agent must:
+
+### Step 1 — Analyze the Error
+
+Do not immediately retry. First, determine the root cause:
+
+- Is this a **transient error**? (e.g., network timeout, env temporarily down) → Retry once, then escalate to the user if it persists.
+- Is this a **user input error**? (e.g., wrong ticket ID, wrong URL) → Ask the user for the correct value.
+- Is this an **environment error**? (e.g., wrong base URL, auth expired) → Ask the user to verify and correct.
+- Is this a **guideline error**? (e.g., wrong selector strategy, wrong MCP tool, bad scroll/visibility assumption) → **Proceed to Step 2.**
+
+---
+
+### Step 2 — Fix the Immediate Problem
+
+Resolve the error in the current session:
+- Correct the selector, navigation step, or interaction causing the failure.
+- Re-confirm with the user before retrying.
+- Document what was changed and why.
+
+---
+
+### Step 3 — Update This File If the Guideline Was Faulty
+
+If the root cause was a rule or guideline in `01-jira-orchestrator.mdc` or `02-ui-validation.mdc` that was incorrect, incomplete, or produced a bad outcome:
+
+1. Identify the exact rule that caused the problem.
+2. Append a record to the **Learned Corrections** section below describing what was wrong and what the correct behaviour should be.
+3. If the faulty rule still exists in the source file, note it here so it can be reviewed and updated.
+
+> The goal is not to blame — it is to make sure the same mistake does not happen again.
+
+---
+
+## Learned Corrections (UI)
+
+> This section is maintained by the agent for **UI** guideline errors. Each entry is written when a guideline error is identified and resolved. Entries are never deleted — only appended.
+
+---
+
+<!-- AGENT: Append new entries below this line in the format shown. Do not edit existing entries. -->
+
+<!--
+### [DATE] — [Brief Title of the Issue]
+
+**Source File:**   [Which .mdc file contained the faulty guideline]
+**Phase:**         [Which phase the error occurred in — e.g., Phase 3-A Step 3]
+**Error:**         [What went wrong — exact error or description]
+**Root Cause:**    [Which guideline or assumption caused it]
+**Fix Applied:**   [What was changed in the current session to resolve it]
+**Rule Update:**   [What should be changed in the source file to prevent recurrence]
+
+---
+-->
+
+---
+
+## Persistent Lessons (UI)
+
+> Broader **UI** patterns noticed over time — not single-incident fixes. Add entries when a recurring class of problem appears.
+
+**Empirical UI patterns (trial-and-error resolutions):** When the correct control or sequence is only found after **multiple failed attempts** (e.g. wrong ref, hidden elements, env timing), append a dated entry here with **what failed**, **what worked**, and **how to confirm success** in the next snapshot. On future runs, **read this section before interacting** with similar pages so the same trial-and-error path is skipped. Do not delete prior entries.
+
+---
+
+<!-- AGENT: Append broad UI lessons below this line. -->
+
+### 2026-03-25 — SketchUp e-commerce QA: selecting “Annual” plan on product buy page
+
+**Site / flow:** `ecom-sketchup-qa.netlify.app` (e.g. `/en/products/sketchup-go/buy`) — **SketchUp Go** plan picker. **MCP:** cursor-ide-browser (`browser_snapshot`, `browser_scroll`, `browser_click`). **Ticket context:** DVW-4736.
+
+**Approaches that failed (avoid repeating as first try):**
+
+1. **Click `role: radio` “SketchUp Go - Annual” via its snapshot `ref`** — MCP returns **element not visible (opacity: 0)**. The native radio is **visually hidden** for custom-styled plan cards; the interactive `ref` targets the hidden input.
+2. **Assume the first snapshot is enough** — Pricing can show `--.-- ---` until APIs settle; **Quantity** and **Add To Cart** may stay **disabled** until the visible plan UI reflects a real selection.
+3. **Click header “CHOOSE PLAN - SketchUp Go” without ensuring viewport** — **Scroll into view** can fail if the control sits above the visible area; fix scroll position first if that error appears.
+
+**Approach that worked:**
+
+1. Optionally wait or dismiss blocking overlays (e.g. Escape) so pricing can load.
+2. **`browser_scroll`** with **`scrollIntoView: true`** targeting a **visible** node in the **Annual** plan card (in-session example: accessible name **SketchUp Go - Annual** on the **rendered price card**, not the hidden radio — snapshot `ref` was a sibling text node under the product heading region, e.g. `e141` in that run).
+3. **`browser_click`** that **visible Annual card / label `ref`** — **not** the `role: radio` ref.
+4. **Verify in the next snapshot:** Annual radio shows **checked** (and often **focused**); **Quantity** spinbutton and **Add To Cart** are **no longer disabled**.
+
+**Handoff to other rules:** Where `02-ui-validation.mdc` says to select a plan, interpret “click Annual” as **click the visible plan tile / displayed Annual label** on this stack unless a future snapshot proves the radio is directly visible.
+
+---
+
+---
+
+## Guidelines for Writing Good Corrections
+
+- **Be specific**: Name the exact tool call, selector, or assumption that failed — not just "the step failed."
+- **Be actionable**: The correction must clearly describe what should happen differently next time.
+- **Be minimal**: One entry per distinct root cause. Do not merge unrelated issues into one entry.
+- **Do not speculate**: Only record what was confirmed as the actual cause, not guesses.
+
+---
+
+## When NOT to Write a Correction (UI)
+
+Do not log an entry if the failure was caused by:
+- A transient network or environment issue (not a guideline problem)
+- The user providing incorrect input (the rule itself was not at fault)
+- A known limitation of a MCP tool that has already been logged in this file
+
+---
+
+## Review Reminder
+
+Before starting **UI** validation (or the UI portion of a **Both** ticket), briefly scan **Learned Corrections** and **Persistent Lessons** in this file — and, for **Both** tickets, the same sections in `self-improvement-api.mdc` when entering API work.
