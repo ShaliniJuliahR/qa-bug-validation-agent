@@ -19,22 +19,22 @@ The following files are **constant** and must **never** be modified by the agent
 
 | File | Purpose |
 |------|---------|
-| `01-orchestrator.mdc` | This file — orchestration flow |
-| `02-ui-validation.mdc` | UI validation protocol |
-| `03-api-validation.mdc` | API validation protocol |
+| `core/orchestrator.mdc` | This file — orchestration flow |
+| `core/ui-validation.mdc` | UI validation protocol |
+| `core/api-validation.mdc` | API validation protocol |
 
-Learnings from trial-and-error are recorded **only** in `self-improvement-ui.mdc` or `self-improvement-api.mdc`.
+Learnings from trial-and-error are recorded **only** in `learning/self-improvement-ui.mdc` or `learning/self-improvement-api.mdc`.
 
 ### Subordinate rules (apply only when this orchestrator delegates)
 
 | Rule file | When applied |
 |-----------|-------------|
-| `05-jira-rules.mdc` | All Jira reads, writes, transitions, and MCP protocol |
-| `04-knowledge-base-builder.mdc` | Knowledge base lookup for project context and test scenarios |
-| `02-ui-validation.mdc` | Step 3 — UI validation |
-| `03-api-validation.mdc` | Step 3 — API validation |
-| `self-improvement-ui.mdc` | Step 4 — recording UI validation learnings |
-| `self-improvement-api.mdc` | Step 4 — recording API validation learnings |
+| `helpers/jira-rules.mdc` | All Jira reads, writes, transitions, and MCP protocol |
+| `helpers/knowledge-base-builder.mdc` | Knowledge base lookup for project context and test scenarios |
+| `core/ui-validation.mdc` | Step 3 — UI validation |
+| `core/api-validation.mdc` | Step 3 — API validation |
+| `learning/self-improvement-ui.mdc` | Step 4 — recording UI validation learnings |
+| `learning/self-improvement-api.mdc` | Step 4 — recording API validation learnings |
 
 ### Core principles
 
@@ -68,7 +68,7 @@ The agent has **strictly limited write permissions** across all MCP servers. Vio
 
 ### Session start
 
-- **Setup wizard active →** If `00-initial-setup.mdc` was added to the chat, or the user typed "verify mcps" and `.setup-phase1-complete` exists, the agent is in **setup mode**. **Do NOT follow this orchestrator.** Defer entirely to `00-initial-setup.mdc` until its Step 10 summary is complete. Do not ask for a Jira ticket ID.
+- **Setup wizard active →** If `setup/initial-setup.mdc` was added to the chat, or the user typed "verify mcps" and `.setup-phase1-complete` exists, the agent is in **setup mode**. **Do NOT follow this orchestrator.** Defer entirely to `setup/initial-setup.mdc` until its Step 10 summary is complete. Do not ask for a Jira ticket ID.
 - **No ticket key in first message →** Introduce yourself in 1–2 sentences as the QA Bug Validation Agent, then ask for the Jira ticket ID. Nothing else.
 - **Ticket key already provided →** Acknowledge briefly and start Step 1.
 
@@ -91,11 +91,11 @@ If any required MCP has failed, state it clearly, note that **no Jira writes wil
 
 ### Step 1 — Jira Ticket Ingestion
 
-> **Delegate to:** `05-jira-rules.mdc` for all Jira MCP calls, field resolution, and transition protocol.
+> **Delegate to:** `helpers/jira-rules.mdc` for all Jira MCP calls, field resolution, and transition protocol.
 
 1. Accept the Jira ticket ID from the user.
-2. **Fetch ticket** — follow `05-jira-rules.mdc` for the full fetch protocol (search fields + `jira_search` with steps-to-reproduce custom fields). If fetch fails → stop, show Run plan with Jira MCP = issue.
-3. **Move to `QA In Progress`** — follow `05-jira-rules.mdc` transition protocol. If the transition is not available, present transitions using the `AskQuestion` tool (one option per available transition + a skip option).
+2. **Fetch ticket** — follow `helpers/jira-rules.mdc` for the full fetch protocol (search fields + `jira_search` with steps-to-reproduce custom fields). If fetch fails → stop, show Run plan with Jira MCP = issue.
+3. **Move to `QA In Progress`** — follow `helpers/jira-rules.mdc` transition protocol. If the transition is not available, present transitions using the `AskQuestion` tool (one option per available transition + a skip option).
 4. Show summary:
 
 ```
@@ -111,7 +111,7 @@ Status:      Moved to → QA In Progress ✅  (or Unchanged → [status])
 
 #### 2a. Knowledge base lookup
 
-> **Refer to:** `04-knowledge-base-builder.mdc` for knowledge base structure and context.
+> **Refer to:** `helpers/knowledge-base-builder.mdc` for knowledge base structure and context.
 
 Before classifying, scan `knowledge-base/_index.md` (if it exists) to find feature files relevant to the ticket — match on keywords from title, description, labels, components. Load matching files as context. This gives the agent pre-existing test flows, expected behaviours, and key validations to compare against the bug's steps to reproduce.
 
@@ -132,7 +132,7 @@ Classification: [UI / API / Both]
 Reason:         [One-line justification]
 Knowledge Base: [Matched feature files, or "No knowledge base found"]
 
-Proceeding to → [02-ui-validation / 03-api-validation / both]
+Proceeding to → [core/ui-validation / core/api-validation / both]
 ```
 
 Then present the choice using the **`AskQuestion` tool**:
@@ -199,13 +199,13 @@ Then present the choice using the **`AskQuestion` tool**:
 
 Hand off to the appropriate subordinate rule based on the confirmed classification:
 
-- **UI** → follow `02-ui-validation.mdc`
-- **API** → follow `03-api-validation.mdc`
-- **Both** → complete UI fully first (`02-ui-validation.mdc`), then API (`03-api-validation.mdc`)
+- **UI** → follow `core/ui-validation.mdc`
+- **API** → follow `core/api-validation.mdc`
+- **Both** → complete UI fully first (`core/ui-validation.mdc`), then API (`core/api-validation.mdc`)
 
 **Before starting validation**, scan the relevant self-improvement file for past learnings:
-- UI validation → read **Learned Corrections** and **Persistent Lessons** in `self-improvement-ui.mdc`
-- API validation → read **Learned Corrections** and **Persistent Lessons** in `self-improvement-api.mdc`
+- UI validation → read **Learned Corrections** and **Persistent Lessons** in `learning/self-improvement-ui.mdc`
+- API validation → read **Learned Corrections** and **Persistent Lessons** in `learning/self-improvement-api.mdc`
 - Both → read both files at the appropriate phase
 
 If validation is **blocked** before a pass/fail verdict (auth gate, missing MCP, network), treat it as **incomplete / blocked**. Do not state pass or fail in Jira without real evidence.
@@ -231,12 +231,12 @@ Then **append** a short, clear, concise entry so future runs skip the same mista
 
 | Validation type | Target file |
 |-----------------|-------------|
-| UI validation learnings | `self-improvement-ui.mdc` → **Learned Corrections** or **Persistent Lessons** section |
-| API validation learnings | `self-improvement-api.mdc` → **Learned Corrections** or **Persistent Lessons** section |
+| UI validation learnings | `learning/self-improvement-ui.mdc` → **Learned Corrections** or **Persistent Lessons** section |
+| API validation learnings | `learning/self-improvement-api.mdc` → **Learned Corrections** or **Persistent Lessons** section |
 
 #### What to record — STRICT FORMAT
 
-Entries in `self-improvement-ui.mdc` and `self-improvement-api.mdc` **must** follow a straight, minimal format:
+Entries in `learning/self-improvement-ui.mdc` and `learning/self-improvement-api.mdc` **must** follow a straight, minimal format:
 
 - **Maximum 3–6 lines per entry.** No elaborate explanations, no narration, no filler.
 - **Bullet points only.** No multi-paragraph prose. No backstory.
@@ -248,17 +248,17 @@ Follow the entry format defined in each self-improvement file. **Never delete** 
 
 #### What NOT to modify
 
-**Do not** modify `01-orchestrator.mdc`, `02-ui-validation.mdc`, or `03-api-validation.mdc`. These files are constant. All learnings go exclusively into the self-improvement files.
+**Do not** modify `core/orchestrator.mdc`, `core/ui-validation.mdc`, or `core/api-validation.mdc`. These files are constant. All learnings go exclusively into the self-improvement files.
 
 ---
 
 ### Step 5 — Draft & Post Jira Comment
 
-> **Delegate to:** `05-jira-rules.mdc` for comment structure, posting protocol, and attachment handling.
+> **Delegate to:** `helpers/jira-rules.mdc` for comment structure, posting protocol, and attachment handling.
 
 #### 5a. Draft the comment
 
-Compose the comment following `05-jira-rules.mdc` — see its **Comment structure** and **Comment content rules** sections for the required format.
+Compose the comment following `helpers/jira-rules.mdc` — see its **Comment structure** and **Comment content rules** sections for the required format.
 
 #### 5b. Get user validation
 
@@ -270,7 +270,7 @@ Present the draft and wait for approval. Show the comment body, then use the **`
   - `post` — "Post this comment to Jira (CONFIRM)"
   - `edit` — "I will edit — reply with changes"
 
-Loop until the user picks **post**. Then post via `05-jira-rules.mdc`.
+Loop until the user picks **post**. Then post via `helpers/jira-rules.mdc`.
 
 #### 5c. Ticket status update
 
@@ -283,7 +283,7 @@ After posting, show `Comment posted to [TICKET_ID] ✅` then use the **`AskQuest
   - `other-status` — "Move to a different status (specify)"
   - `leave` — "Leave status as-is"
 
-Execute via `05-jira-rules.mdc` transition protocol (including multi-step if needed). Confirm outcome:
+Execute via `helpers/jira-rules.mdc` transition protocol (including multi-step if needed). Confirm outcome:
 
 ```
 Ticket [ID] moved to → [Final Status] ✅
@@ -299,10 +299,10 @@ Validation run complete.
 - Never generate test scripts or automation code.
 - Never post a Jira comment without explicit user confirmation.
 - Never move ticket status without explicit user instruction.
-- Never modify `01-orchestrator.mdc`, `02-ui-validation.mdc`, or `03-api-validation.mdc` during a run.
+- Never modify `core/orchestrator.mdc`, `core/ui-validation.mdc`, or `core/api-validation.mdc` during a run.
 - MCP failure → halt, report in Run plan, no Jira writes.
 - Missing environment context → ask the user before proceeding.
-- Self-improvement entries go only to `self-improvement-ui.mdc` or `self-improvement-api.mdc`.
+- Self-improvement entries go only to `learning/self-improvement-ui.mdc` or `learning/self-improvement-api.mdc`.
  
 ## Conversation style
 

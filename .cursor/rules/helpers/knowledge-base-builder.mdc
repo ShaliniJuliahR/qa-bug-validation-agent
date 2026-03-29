@@ -186,7 +186,7 @@ Each feature file must follow this structure:
 - **Logical ordering within each file:** setup/prerequisite flows first, then happy-path flows, then edge cases, then error/negative flows.
 - **Steps must be concrete and actionable** — the agent reads these during live validation to know exactly what to do and what to expect.
 - **Strip Zephyr-internal metadata** that adds no validation value (internal numeric IDs, audit timestamps, execution history).
-- **Preserve priority** (P1/P2/P3) on each flow so the agent can prioritize during validation per `01-orchestrator.mdc` principles.
+- **Preserve priority** (P1/P2/P3) on each flow so the agent can prioritize during validation per `core/orchestrator.mdc` principles.
 - **Include the Zephyr test case key** (e.g. `PROJ-T123`) in each flow heading for traceability.
 
 ---
@@ -213,7 +213,7 @@ Write `knowledge-base/_index.md`:
 
 ## STEP 7 — Wire into the Orchestrator (first run only)
 
-On the **first** knowledge-base build (i.e. `knowledge-base/` did not previously exist), add the following block to `01-orchestrator.mdc` in the **Phase 2 — Classification** section, immediately after the classification table:
+On the **first** knowledge-base build (i.e. `knowledge-base/` did not previously exist), add the following block to `core/orchestrator.mdc` in the **Phase 2 — Classification** section, immediately after the classification table:
 
 ```
 ### Knowledge base lookup
@@ -244,7 +244,7 @@ Files written:
   - ...
 
 The agent will now consult these files during validation runs via the
-knowledge base lookup added to 01-orchestrator.mdc Phase 2.
+knowledge base lookup added to core/orchestrator.mdc Phase 2.
 ```
 
 ---

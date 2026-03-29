@@ -1,11 +1,11 @@
 ---
-description: Jira MCP implementation rules — ticket fetching, steps-to-reproduce field extraction, transitions (including multi-step), comment posting, and attachment handling. Used by 01-orchestrator.mdc for all Jira interactions.
+description: Jira MCP implementation rules — ticket fetching, steps-to-reproduce field extraction, transitions (including multi-step), comment posting, and attachment handling. Used by core/orchestrator.mdc for all Jira interactions.
 alwaysApply: false
 ---
 
 # Jira Rules — MCP Implementation Protocol
 
-This file contains all Jira-specific implementation details. The orchestrator (`01-orchestrator.mdc`) delegates here whenever it needs to read from or write to Jira.
+This file contains all Jira-specific implementation details. The orchestrator (`core/orchestrator.mdc`) delegates here whenever it needs to read from or write to Jira.
 
 ---
 

@@ -22,4 +22,4 @@ TRIMBLE_QA_UI_PASSWORD=<your-test-password>
 ```
 
 4. Update the Postman API key in `.cursor/mcp.json` under `postman_mcp_server > headers > Authorization`.
-5. Open a new Cursor chat, attach `.cursor/rules/00-initial-setup.mdc`, and type **hi** to run the guided setup.
+5. Open a new Cursor chat, attach `.cursor/rules/setup/initial-setup.mdc`, and type **hi** to run the guided setup.
