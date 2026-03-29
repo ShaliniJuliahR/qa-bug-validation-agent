@@ -5,7 +5,7 @@ alwaysApply: false
 
 # UI Validation — Playwright MCP
 
-> **Primary flow:** `01-orchestrator.mdc` — this file runs only for **Phase 3** when classification is **UI** or **Both**.
+> **Primary flow:** `core/orchestrator.mdc` — this file runs only for **Phase 3** when classification is **UI** or **Both**.
 
 **Browser automation:** Use **only** the **Playwright MCP** for navigation, clicks, fills, waits, scrolling, tabs/windows, and screenshots during UI validation. Do **not** use any other browser or embedded IDE browser MCP for these steps.
 
@@ -25,8 +25,8 @@ Based on the ticket's steps to reproduce and description, draft two things:
 1. **Environment variables (default for all UI runs on this project)** — Read from the workspace **`.env`** file (or process env if already loaded):
    - `TRIMBLE_QA_UI_EMAIL`
    - `TRIMBLE_QA_UI_PASSWORD`  
-   Use these values only for **QA/staging** UI validation. **Do not** paste the password into Jira, chat summaries, or screenshots; refer to “signed in with configured QA account” when documenting.
-   - **Checkout card payment (when the flow requires a card in an embedded payment frame):** Prefer `TRIMBLE_QA_PAYMENT_*` from `.env` if set (`TRIMBLE_QA_PAYMENT_CARD_NUMBER`, `TRIMBLE_QA_PAYMENT_CARD_EXP_MM`, `TRIMBLE_QA_PAYMENT_CARD_EXP_YYYY`, `TRIMBLE_QA_PAYMENT_CARD_CVC`, optional `TRIMBLE_QA_PAYMENT_NAME_ON_CARD`). If unset, use **processor-approved QA test PANs** only when your team allows it; otherwise ask the user once for test card details to store in `.env`. **Never** paste full card numbers or CVC into Jira or public chat—redact in evidence (e.g. “card ending 4242”).
+   Use these values only for **QA/staging** UI validation. **Do not** paste the password into Jira, chat summaries, or screenshots; refer to "signed in with configured QA account" when documenting.
+   - **Checkout card payment (when the flow requires a card in an embedded payment frame):** Prefer `TRIMBLE_QA_PAYMENT_*` from `.env` if set (`TRIMBLE_QA_PAYMENT_CARD_NUMBER`, `TRIMBLE_QA_PAYMENT_CARD_EXP_MM`, `TRIMBLE_QA_PAYMENT_CARD_EXP_YYYY`, `TRIMBLE_QA_PAYMENT_CARD_CVC`, optional `TRIMBLE_QA_PAYMENT_NAME_ON_CARD`). If unset, use **processor-approved QA test PANs** only when your team allows it; otherwise ask the user once for test card details to store in `.env`. **Never** paste full card numbers or CVC into Jira or public chat—redact in evidence (e.g. "card ending 4242").
 2. **If either variable is missing or empty** — Ask the user once for **email and password** (or confirm they will sign in manually and say when to continue). **Do not** invent credentials.
 3. **Include auth in the written plan** — When sign-in is expected, list an explicit step such as: *Sign in via Trimble Identity using QA credentials from env (or user-supplied)*, then continue steps to reproduce.
 
@@ -108,7 +108,7 @@ If `playwright_click` fails, the selector is missing, or the button/control is *
 
 1. **Capture a screenshot** of the current page and **analyze it** — identify blockers such as modals, cookie/consent banners, drawers, loading overlays, a **new tab or popup** that stole focus, or an unexpected page (404, login gate, intermediate screen).
 2. **Recover context**, then **retry the same click step once** (or re-wait for the selector if appropriate):
-   - **Modal / popup / dialog:** Close or dismiss it (close control, “Cancel”, or equivalent MCP action); complete any required field only if the ticket’s flow demands it.
+   - **Modal / popup / dialog:** Close or dismiss it (close control, "Cancel", or equivalent MCP action); complete any required field only if the ticket's flow demands it.
    - **Wrong tab or extra window:** Use tab/window listing and MCP tools to **switch to the correct tab** or **close** a stray popup tab/window if that restores the intended page.
    - **Wrong page or accidental navigation:** Use **back** navigation or **re-navigate** to the URL from the validation plan, then proceed toward the target again.
    - **Banner / overlay blocking clicks:** Dismiss or accept per environment policy so the underlying UI is reachable.
@@ -142,16 +142,16 @@ If a Playwright MCP error is encountered during any step:
    Impact:  [Steps that could not be completed as a result]
    ```
 3. Suggest a likely cause if identifiable (e.g., selector not found, page did not load, authentication failed).
-4. Ask how to proceed using the **`AskQuestion` tool**. If the error prevented reaching a **validation point** where pass/fail is known, prioritize options that **unblock progress toward that point** (not only “skip” — skipping may leave the bug unjudged; say so if applicable):
+4. Ask how to proceed using the **`AskQuestion` tool**. If the error prevented reaching a **validation point** where pass/fail is known, prioritize options that **unblock progress toward that point** (not only "skip" — skipping may leave the bug unjudged; say so if applicable):
 
    - **id:** `ui-step-error`
-   - **prompt:** “Step [N] failed. How would you like to proceed?”
+   - **prompt:** "Step [N] failed. How would you like to proceed?"
    - **options:**
-     - `retry` — “Retry this step (I will adjust and retry)”
-     - `skip` — “Skip this step and continue”
-     - `abort` — “Abort UI validation”
+     - `retry` — "Retry this step (I will adjust and retry)"
+     - `skip` — "Skip this step and continue"
+     - `abort` — "Abort UI validation"
 
-> ⚠️ Also refer to `self-improvement-ui.mdc` — if the error was caused by a faulty guideline in this file, update that file accordingly after resolving the issue.
+> ⚠️ Also refer to `learning/self-improvement-ui.mdc` — if the error was caused by a faulty guideline in this file, update that file accordingly after resolving the issue.
 
 ---
 
@@ -177,7 +177,7 @@ Overall Result: PASS ✅ / FAIL ❌ / Incomplete — blocked (no pass-fail verdi
 
 If the run ended **blocked** before a validation verdict, use **Incomplete — blocked** for overall result, list which evidence was missing, and return that summary to the orchestrator — **do not** draft Jira wording that claims the bug passed or failed until the user unblocks and validation completes.
 
-Return this result summary to `01-orchestrator.mdc` for use in the Jira comment draft.
+Return this result summary to `core/orchestrator.mdc` for use in the Jira comment draft.
 
 ---
 

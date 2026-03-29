@@ -9,7 +9,7 @@ alwaysApply: false
 
 **While this wizard is active, the agent is in SETUP MODE.** This means:
 
-1. **Do NOT follow `01-orchestrator.mdc`** — the orchestrator is irrelevant until setup is complete.
+1. **Do NOT follow `core/orchestrator.mdc`** — the orchestrator is irrelevant until setup is complete.
 2. **Do NOT ask for a Jira ticket ID** — the agent has no business validating bugs until every setup step has passed.
 3. **Do NOT introduce yourself as the QA Bug Validation Agent** — you are running the setup wizard.
 4. **After completing each step, IMMEDIATELY proceed to the next step** — do not pause, do not ask what the user wants to do next, do not fall back to any other rule file.
@@ -46,7 +46,7 @@ For **Phase 2** (new chat — `.setup-phase1-complete` exists, e.g. user typed "
 
 ## Activation check
 
-This file only runs when the user **explicitly adds it to the chat** (via `@00-initial-setup.mdc`). It is never auto-triggered by the orchestrator.
+This file only runs when the user **explicitly adds it to the chat** (via `@setup/initial-setup.mdc`). It is never auto-triggered by the orchestrator.
 
 When activated, check for `.setup-phase1-complete` at the project root:
 
@@ -402,7 +402,7 @@ Run `npm install` if `node_modules/` doesn't exist. Show success or failure. If 
 
 ## STEP 8 — Knowledge Base Setup
 
-Delegate to `04-knowledge-base-builder.mdc` to import test cases from Zephyr Scale. Return here after it completes.
+Delegate to `helpers/knowledge-base-builder.mdc` to import test cases from Zephyr Scale. Return here after it completes.
 
 **✅ Step 8 done → Immediately proceed to Step 9. Do NOT stop here.**
 
@@ -429,7 +429,7 @@ Setup complete ✅
   Knowledge base: built
 
 You're all set! Open a new chat and give me a Jira ticket ID to start validating.
-Tip: to re-run this wizard, add @00-initial-setup.mdc to a new chat.
+Tip: to re-run this wizard, add @setup/initial-setup.mdc to a new chat.
 ```
 
 ---
@@ -437,7 +437,7 @@ Tip: to re-run this wizard, add @00-initial-setup.mdc to a new chat.
 ## Guardrails
 
 - **NEVER ask for a Jira ticket ID during setup.** The agent is in setup mode until Step 10 is complete. Asking for a ticket before that means setup failed.
-- **NEVER fall back to `01-orchestrator.mdc` during setup.** The orchestrator does not apply until the setup wizard has exited with the Step 10 summary.
+- **NEVER fall back to `core/orchestrator.mdc` during setup.** The orchestrator does not apply until the setup wizard has exited with the Step 10 summary.
 - **After each step, proceed to the next step immediately.** Do not pause between steps. Do not ask "what would you like to do next?" — the answer is always "the next setup step."
 - **Every step is mandatory** — do not offer skip options. All MCPs must be connected, write tools must be disabled, dependencies must be installed, and the knowledge base must be built before setup is marked complete.
 - **Never skip MCP verification** — always attempt the probe calls. Loop until every MCP passes.
@@ -445,4 +445,4 @@ Tip: to re-run this wizard, add @00-initial-setup.mdc to a new chat.
 - **Never commit `.env`** — verify `.gitignore` includes it.
 - **One question at a time** — do not dump all setup questions in a single message. Guide step by step.
 - **Idempotent** — if the user re-runs the wizard, it should detect existing config (`.env`, `node_modules/`, `knowledge-base/`) and offer to keep or reconfigure rather than overwriting blindly.
-- **This file is constant** — the agent must never modify `00-initial-setup.mdc` during a validation run.
+- **This file is constant** — the agent must never modify `setup/initial-setup.mdc` during a validation run.

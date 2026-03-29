@@ -1,0 +1,8 @@
+---
+description: Agent-writable file for recording API validation learnings. Append-only — never delete existing entries. Read by core/orchestrator.mdc before each API validation run.
+alwaysApply: false
+---
+
+## Learned Corrections
+
+## Persistent Lessons
