@@ -1,8 +1,83 @@
 ---
-description: Agent-writable file for recording UI validation learnings. Append-only — never delete existing entries. Read by core/orchestrator.mdc before each UI validation run.
-alwaysApply: false
+description: UI (Playwright MCP) self-improvement for the QA Validation Agent. When a UI validation error reveals a faulty guideline, append corrections here and update the source rule file. alwaysApply applies so learned UI lessons are available before runs.
+alwaysApply: true
 ---
 
-## Learned Corrections
+# Self-Improvement — UI Validation
 
-## Persistent Lessons
+Subordinate to `01-orchestrator.mdc`. This file records **post-mortem corrections** for UI guideline errors only. For **Both** tickets, also scan `self-improvement-api.mdc`.
+
+---
+
+## Error Response Protocol (UI)
+
+On UI error during validation:
+
+1. **Classify** — transient / user-input / environment / guideline error.
+2. **Transient** → retry once, escalate if persists. **User-input / env** → ask user to correct.
+3. **Guideline error** → fix in session, then append to **Learned Corrections** below.
+
+---
+
+## Entry Format (strict)
+
+```
+### [DATE] — [Title]
+- **Source:** [file.mdc]
+- **Error:** [what happened]
+- **Root Cause:** [which rule/assumption]
+- **Fix:** [what resolved it]
+- **Rule Update:** [what to change in source file]
+```
+
+**Rules:** Max 3–6 lines per entry. Bullets only. No prose. Name exact tool calls / selectors / URLs. One entry per root cause. Never delete entries — only append.
+
+---
+
+## Learned Corrections (UI)
+
+<!-- AGENT: Append entries below. Do not edit existing entries. -->
+
+---
+
+## Persistent Lessons (UI)
+
+Read this section **before** interacting with similar pages so past trial-and-error is not repeated.
+
+<!-- AGENT: Append entries below. Do not edit existing entries. -->
+
+### 2026-03-25 — SketchUp plan picker: selecting Annual plan (DVW-4736)
+
+- **Site:** `ecom-sketchup-qa.netlify.app` `/en/products/sketchup-go/buy`
+- **Failed:** `playwright_click` on `role: radio` "SketchUp Go - Annual" → element not visible (opacity: 0, hidden radio). Clicking header without scrolling into view also fails.
+- **Worked:** Click the **visible Annual plan card/label** (not the hidden radio). Scroll into view first if needed.
+- **Verify:** Screenshot or snapshot shows Annual radio checked, Quantity + Add To Cart enabled, price not "--.--".
+
+---
+
+### 2026-03-29 — SketchUp plan picker: force-click radio fallback when pricing APIs fail
+
+- **Site:** `ecom-sketchup-qa.netlify.app` `/en/products/sketchup-go/buy`
+- **Failed:** Clicking visible card registered but pricing APIs 401/403 → prices stayed "--.--", cart disabled.
+- **Worked:** Reload page → `browser_run_code` with `getByRole('radio', { name: 'SketchUp Go - Annual' }).click({ force: true })` → wait 3s → pricing loads, cart enabled.
+- **Sequence:** Navigate → reload → force-click radio → wait 3s → verify snapshot.
+
+---
+
+### 2026-03-29 — Trimble Identity sign-in: fill does not enable Next button
+
+- **Site:** `stage.id.trimblecloud.com` sign-in page.
+- **Failed:** `browser_fill` / `browser_fill_form` on email textbox → "Next" stays disabled (page validates via keydown events).
+- **Worked:** Clear field → `browser_run_code` with `input.type('email@address')` (char-by-char typing) → wait 1s → Next enabled.
+
+---
+
+## When NOT to Write a Correction
+
+Skip if failure was: transient network/env issue, user-input error, or already-logged MCP limitation.
+
+---
+
+## Review Reminder
+
+Before UI validation, scan **Learned Corrections** and **Persistent Lessons** above. For **Both** tickets, also scan `self-improvement-api.mdc`.

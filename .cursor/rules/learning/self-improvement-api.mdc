@@ -1,8 +1,73 @@
 ---
-description: Agent-writable file for recording API validation learnings. Append-only — never delete existing entries. Read by core/orchestrator.mdc before each API validation run.
-alwaysApply: false
+description: API (Postman MCP / HTTP) self-improvement for the QA Validation Agent. When an API validation error reveals a faulty guideline, append corrections here and update the source rule file. alwaysApply applies so learned API lessons are available before runs.
+alwaysApply: true
 ---
 
-## Learned Corrections
+# Self-Improvement — API Validation
 
-## Persistent Lessons
+Subordinate to `01-orchestrator.mdc`. This file records **post-mortem corrections** for API guideline errors only. For **Both** tickets, also scan `self-improvement-ui.mdc`.
+
+---
+
+## Error Response Protocol (API)
+
+On API error during validation:
+
+1. **Classify** — transient / user-input / environment / guideline error.
+2. **Transient** → retry once, escalate if persists. **User-input / env** → ask user to correct.
+3. **Guideline error** → fix in session, then append to **Learned Corrections** below.
+
+---
+
+## Entry Format (strict)
+
+```
+### [DATE] — [Title]
+- **Source:** [file.mdc]
+- **Error:** [what happened]
+- **Root Cause:** [which rule/assumption]
+- **Fix:** [what resolved it]
+- **Rule Update:** [what to change in source file]
+```
+
+**Rules:** Max 3–6 lines per entry. Bullets only. No prose. Name exact tool calls / URLs / selectors. One entry per root cause. Never delete entries — only append.
+
+---
+
+## Learned Corrections (API)
+
+<!-- AGENT: Append entries below. Do not edit existing entries. -->
+
+---
+
+## Persistent Lessons (API)
+
+<!-- AGENT: Append entries below. Do not edit existing entries. -->
+
+### 2026-03-29 — QA accounts-service URL mismatch in Postman environment
+
+- **When:** Create Account API returns 404 in QA.
+- **Failed:** `base_url_accounts` env var = `https://qa.shop.trimble.com/api/account-service/v1` (no 's').
+- **Worked:** Actual QA URL is `https://qa.shop.trimble.com/api/accounts-service/v1/accounts` (`accounts-service` with 's').
+- **Body:** Address fields are `addressLine1`/`addressLine2` (not `line1`/`line2`).
+
+---
+
+### 2026-03-29 — Obtaining user access token via browser sessionStorage
+
+- **When:** API returns 401/403 or collection notes say "user token" / "session token".
+- **Do:** Open browser → navigate `https://qa.shop.trimble.com` (QA env) → log in with `.env` credentials (`TEST_EMAIL` / `TEST_PASSWORD`) → run `sessionStorage.getItem('token')` → use as `Authorization: Bearer <token>`.
+- **Env map:** QA = `https://qa.shop.trimble.com`
+- **Notes:** Token is session-scoped. Store in `.env` as `USER_ACCESS_TOKEN`. Confirm with user before opening browser.
+
+---
+
+## When NOT to Write a Correction
+
+Skip if failure was: transient network/env issue, user-input error, or already-logged MCP limitation.
+
+---
+
+## Review Reminder
+
+Before API validation, scan **Learned Corrections** and **Persistent Lessons** above. For **Both** tickets, also scan `self-improvement-ui.mdc`.
