@@ -5,7 +5,7 @@ alwaysApply: false
 
 # API Validation — Postman MCP
 
-> **Primary flow:** `01-jira-orchestrator.mdc` — this file runs only for **Phase 3** when classification is **API** or **Both**.
+> **Primary flow:** `01-orchestrator.mdc` — this file runs only for **Phase 3** when classification is **API** or **Both**.
 
 ---
 
@@ -25,10 +25,15 @@ Before API validation, I need:
 Collection: [which Postman collection?]
 Environment: [DEV / QA / Staging / …]
 
-Choose:
-1. I'll reply with collection name + environment in my next message
-2. List available collections/environments from Postman (if MCP supports it)
 ```
+
+Then present the choice using the **`AskQuestion` tool**:
+
+- **id:** `api-collection-env`
+- **prompt:** “How would you like to provide the collection and environment?”
+- **options:**
+  - `reply` — “I'll reply with collection name + environment in my next message”
+  - `list` — “List available collections/environments from Postman (if MCP supports it)”
 
 Wait until you have both collection and environment (by number pick or explicit names). Do not proceed to any API fetch or call without both confirmed.
 
@@ -65,12 +70,17 @@ If the ticket requires validation of multiple endpoints or scenarios, identify a
 
 (Non-P1 cases have been excluded from this validation run.)
 
-Choose:
-1. Proceed with these P1 cases
-2. I will correct the case list (reply with changes)
 ```
 
-Do not proceed until the user chooses **1** (or unambiguous **CONFIRM** mapped to proceed).
+Then present the choice using the **`AskQuestion` tool**:
+
+- **id:** `api-p1-confirm`
+- **prompt:** “Proceed with these P1 test cases or correct?”
+- **options:**
+  - `proceed` — “Proceed with these P1 cases”
+  - `correct` — “I will correct the case list (reply with changes)”
+
+Do not proceed until the user selects **proceed** (or sends an unambiguous **CONFIRM**).
 
 ---
 
@@ -92,10 +102,15 @@ Auth:         [Auth type — Bearer Token / API Key / Basic Auth / None]
 
 If auth credentials are needed, ask for them in the same turn or before execution.
 
-Choose:
-1. Execute this call
-2. I will correct the request (reply with changes)
 ```
+
+Then present the choice using the **`AskQuestion` tool**:
+
+- **id:** `api-call-confirm`
+- **prompt:** “Execute this API call or correct the request?”
+- **options:**
+  - `execute` — “Execute this call”
+  - `correct` — “I will correct the request (reply with changes)”
 
 - If credentials or tokens are required and not available in the Postman environment, ask the user to supply them explicitly at this step.
 - Never assume or fabricate auth tokens.
@@ -120,20 +135,27 @@ Response Body:
 
 Observation: [Agent's interpretation — does this response indicate the bug is fixed? Note any unexpected fields, status codes, or error messages.]
 
-Choose:
-1. Continue to next case
-2. Stop here (discuss this response)
 ```
 
-If the user chose **one-at-a-time** review at the start of Step 5, after each response wait until they pick **1** or **2** before the next call. If they chose **run all**, skip the per-response **Choose** block until the final summary (or only on error).
+Then present the choice using the **`AskQuestion` tool**:
+
+- **id:** `api-response-review`
+- **prompt:** “Continue to the next case or stop to discuss?”
+- **options:**
+  - `continue` — “Continue to next case”
+  - `stop` — “Stop here (discuss this response)”
+
+If the user selected **one-at-a-time** review at the start of Step 5, after each response wait until they pick **continue** or **stop** before the next call. If they chose **run-all**, skip the per-response `AskQuestion` prompt until the final summary (or only on error).
 
 Clarify review preference at the start of Step 5 (before the first execution):
 
-```
-Choose:
-1. Show each response one at a time — wait for my reply before the next call
-2. Run all cases — show the full summary at the end
-```
+Present the choice using the **`AskQuestion` tool**:
+
+- **id:** `api-review-preference`
+- **prompt:** “How would you like to review API responses?”
+- **options:**
+  - `one-at-a-time` — “Show each response one at a time — wait for my reply before the next call”
+  - `run-all` — “Run all cases — show the full summary at the end”
 
 ---
 
@@ -160,13 +182,14 @@ If an API call returns an unexpected error (e.g., 500, connection refused, auth 
    Body:     [Error response body]
    Likely Cause: [e.g., Invalid auth token / Environment URL misconfigured / Endpoint not deployed to this env]
    ```
-3. Ask how to proceed with a minimal numbered list. If the error means **no pass/fail verdict** is possible yet, say so and prioritize options that **unblock** the validation point:
-   ```
-   Choose:
-   1. Retry with corrected parameters (I'll provide details)
-   2. Skip this case and continue
-   3. Abort API validation
-   ```
+3. Ask how to proceed using the **`AskQuestion` tool**. If the error means **no pass/fail verdict** is possible yet, say so and prioritize options that **unblock** the validation point:
+
+   - **id:** `api-error-action`
+   - **prompt:** “Case [N] failed. How would you like to proceed?”
+   - **options:**
+     - `retry` — “Retry with corrected parameters (I'll provide details)”
+     - `skip` — “Skip this case and continue”
+     - `abort` — “Abort API validation”
 
 > ⚠️ Also refer to `self-improvement-api.mdc` — if the error was caused by a faulty guideline in this file, update that file after resolving the issue.
 
@@ -189,7 +212,7 @@ Overall Result: PASS ✅ / FAIL ❌ / Incomplete — blocked (no pass-fail verdi
 
 If the run ended **blocked** before a verdict on the bug, use **Incomplete — blocked** and describe what the user must supply to proceed — **do not** draft Jira wording that asserts the bug passed or failed until validation completes.
 
-Return this result summary to `01-jira-orchestrator.mdc` for use in the Jira comment draft.
+Return this result summary to `01-orchestrator.mdc` for use in the Jira comment draft.
 
 ---
 

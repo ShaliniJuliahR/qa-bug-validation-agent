@@ -1,0 +1,448 @@
+---
+alwaysApply: false
+---
+# Initial Project Setup — Onboarding Wizard
+
+---
+
+## CRITICAL — Setup mode overrides all other rules
+
+**While this wizard is active, the agent is in SETUP MODE.** This means:
+
+1. **Do NOT follow `01-orchestrator.mdc`** — the orchestrator is irrelevant until setup is complete.
+2. **Do NOT ask for a Jira ticket ID** — the agent has no business validating bugs until every setup step has passed.
+3. **Do NOT introduce yourself as the QA Bug Validation Agent** — you are running the setup wizard.
+4. **After completing each step, IMMEDIATELY proceed to the next step** — do not pause, do not ask what the user wants to do next, do not fall back to any other rule file.
+5. **The agent MUST continue executing steps sequentially until the Setup Completion Checklist (below) is fully satisfied.** Only then may the agent show the final summary and exit setup mode.
+
+If the agent ever feels the urge to ask for a Jira ticket or say "Ready for a ticket whenever you are", **STOP** — that means setup is not complete and there are remaining steps to execute.
+
+---
+
+## Setup Completion Checklist
+
+The agent must track this checklist throughout the session. **Setup is NOT complete until every item is checked.** After completing each step, mentally check it off and move to the next unchecked item. **Do not show the final summary (Step 10) until all items are done.**
+
+For **Phase 1** (first chat — fresh install, no `.setup-phase1-complete`):
+
+- [ ] Step 1 — Prerequisites verified
+- [ ] Step 2 — Tokens configured in .env
+- [ ] Step 3 — MCP servers green in Cursor Settings
+- [ ] `.setup-phase1-complete` written → **STOP this chat, hand off to new chat**
+
+For **Phase 2** (new chat — `.setup-phase1-complete` exists, e.g. user typed "verify mcps"):
+
+- [ ] Step 4 — All 4 MCP connections verified with real calls
+- [ ] Step 5 — Write tools disabled on Zephyr & Postman
+- [ ] Step 6 — `.env` exists and is in `.gitignore`
+- [ ] Step 7 — Dependencies installed (`node_modules/` exists)
+- [ ] Step 8 — Knowledge base built (`knowledge-base/_index.md` exists)
+- [ ] Step 9 — `.setup-phase1-complete` deleted
+- [ ] Step 10 — Final summary shown → **Setup complete, exit setup mode**
+
+**After each step completes, say "Moving to Step N" and proceed immediately.** Do not wait for the user to ask.
+
+---
+
+## Activation check
+
+This file only runs when the user **explicitly adds it to the chat** (via `@00-initial-setup.mdc`). It is never auto-triggered by the orchestrator.
+
+When activated, check for `.setup-phase1-complete` at the project root:
+
+- **`.setup-phase1-complete` exists** → Phase 1 (token config) is done. **Skip to Step 4** (Verify MCP Connections). This is the expected state when the user opens a new chat and types "verify mcps".
+- **`.setup-phase1-complete` does NOT exist** → Fresh install. **Run the onboarding flow below from Step 1.**
+
+---
+
+## Welcome
+
+When setup is needed, greet the user briefly:
+
+```
+Welcome to the QA Bug Validation Agent! 👋
+
+The MCP servers are already configured in .cursor/mcp.json.
+You just need to add your tokens to .env (secrets never go in mcp.json).
+
+Setup steps (this chat):
+  1. Prerequisites check
+  2. Generate & configure tokens in .env
+  3. Verify MCP servers in Cursor Settings
+
+Then open a new chat and type "verify mcps" to continue:
+  4. Verify MCP connections
+  5. Disable write tools on Zephyr & Postman
+  6. Environment file (.env)
+  7. Dependencies (npm install)
+  8. Knowledge base (Zephyr Scale test cases)
+
+Let's go!
+```
+
+Proceed directly to STEP 1 — do not show a rule-file overview or ask "ready?" questions. Start the setup immediately.
+
+### User prompts — use the `AskQuestion` tool
+
+**All choice points** in this wizard must use the **`AskQuestion` tool** (interactive selectable options in the IDE) instead of plain-text numbered lists. This gives the user a clickable UI instead of requiring them to type a number or "done". Each prompt should have a clear `id`, a concise `prompt`, and well-labelled `options`.
+
+---
+
+## STEP 1 — Prerequisites Check
+
+Before starting, verify the user has:
+- **Node.js 18+** (`node -v` to check)
+- **Docker Desktop** installed, licensed, and running — required for the Jira MCP
+
+Ask using **AskQuestion**:
+
+```json
+{
+  "id": "prerequisites",
+  "prompt": "Do you have Node.js 18+ and Docker Desktop installed and running?",
+  "options": [
+    { "id": "yes", "label": "Yes — both ready" },
+    { "id": "no",  "label": "No — I need to install something first" }
+  ]
+}
+```
+
+- **yes** → Continue to STEP 2.
+- **no** → Tell them what to install and wait until they confirm (re-prompt with the same question).
+
+---
+
+## STEP 2 — Generate & Configure Tokens
+
+All MCP secrets are stored in `.env` (gitignored, never committed). The file `.cursor/mcp.json` references them automatically via `--env-file` (Docker) and `dotenv-cli` (npx servers).
+
+There are **two tokens** to generate. The Jira PAT is used for both the Jira and Zephyr MCPs.
+
+### 2A. Jira Personal Access Token (PAT)
+
+Tell the user:
+
+```
+How to generate your Jira PAT:
+  1. Log in to Jira (https://jira.trimble.tools)
+  2. Click your profile avatar (top-right) → Profile
+  3. Go to "API Token Authentication"
+  4. Click "New API token"
+  5. Select "Read & Write" option
+  6. Click on "Create API Token"
+  7. Copy the token immediately — you won't see it again
+```
+
+Once they have the token, tell them:
+
+```
+Open .env at the project root and set BOTH of these variables to your Jira PAT:
+  JIRA_PERSONAL_TOKEN=<your-jira-pat>
+  ZEPHYR_API_KEY=<your-jira-pat>
+
+(They use the same token — Jira PAT authenticates both the Jira and Zephyr MCPs.)
+```
+
+Then ask using **AskQuestion**:
+
+```json
+{
+  "id": "jira-pat-done",
+  "prompt": "Have you added your Jira PAT to JIRA_PERSONAL_TOKEN and ZEPHYR_API_KEY in .env?",
+  "options": [
+    { "id": "done",      "label": "Yes — added" },
+    { "id": "need-help", "label": "Need help" }
+  ]
+}
+```
+
+### 2B. Postman API Key
+
+Tell the user:
+
+```
+How to generate your Postman API key:
+  1. Go to: https://trimble-inc.postman.co/settings/me/api-keys
+  2. Click "Generate API Key"
+  3. Give it a name (e.g. "QA Bug Validation Agent")
+  4. Copy the key immediately — you won't see it again
+```
+
+Once they have the key, tell them:
+
+```
+Add the key to .env:
+  POSTMAN_API_KEY=<your-postman-api-key>
+
+Then also update .cursor/mcp.json → postman_mcp_server → headers → Authorization:
+  Replace the value after "Bearer " with your key.
+
+(The Postman MCP uses a URL-based connection where Cursor sends headers directly,
+so the key must also be in mcp.json. Store it in .env as the source of truth.)
+```
+
+Then ask using **AskQuestion**:
+
+```json
+{
+  "id": "postman-key-done",
+  "prompt": "Have you added your Postman API key to .env and mcp.json?",
+  "options": [
+    { "id": "done",      "label": "Yes — added to both" },
+    { "id": "need-help", "label": "Need help" }
+  ]
+}
+```
+
+### 2C. Collect Project Info
+
+Ask the user for two values needed for verification and later steps:
+
+**Zephyr project key:**
+
+```
+How to find your Zephyr project key:
+  1. Open Jira → navigate to Zephyr Scale (https://jira.trimble.tools/secure/Tests.jspa#/v2/testCases)
+  2. Select your project
+  3. The project key is appended in the end of the url
+     (e.g. https://jira.trimble.tools/secure/Tests.jspa#/v2/testCases?projectId=36100)
+```
+
+**Postman workspace ID:**
+
+```
+How to find your Postman workspace ID:
+  1. Open Postman (web: https://web.postman.co or desktop app)
+  2. Click on your workspace name in the left sidebar
+  3. Copy your workspace ID
+```
+
+Store both values for STEP 4 and STEP 8.
+
+**Immediately after collecting both values**, append them to `.env` at the project root:
+
+```
+ZEPHYR_PROJECT_KEY=<collected project key>
+POSTMAN_WORKSPACE_ID=<collected workspace ID>
+```
+
+Confirm to the user that the values have been saved to `.env`.
+
+Tell the user to restart Cursor, then ask using **AskQuestion**:
+
+```json
+{
+  "id": "restart-done",
+  "prompt": "Restart Cursor so the MCP servers pick up the new .env values. Ready to continue?",
+  "options": [
+    { "id": "done",      "label": "Done — Cursor restarted" },
+    { "id": "need-help", "label": "Need help" }
+  ]
+}
+```
+
+- **done** → Proceed to STEP 3.
+
+---
+
+## STEP 3 — Verify MCP Servers in Cursor Settings
+
+After restarting Cursor, tell the user:
+
+```
+Go to Cursor Settings → Tools & MCP and verify that all four MCP servers are listed:
+
+  1. playwright
+  2. mcp-atlassian
+  3. zephyr-server
+  4. postman_mcp_server
+
+Each server should show a green / connected indicator.
+```
+
+Then ask using **AskQuestion**:
+
+```json
+{
+  "id": "mcp-settings-check",
+  "prompt": "Are all four MCP servers visible and green in Cursor Settings → Tools & MCP?",
+  "options": [
+    { "id": "yes",    "label": "Yes — all good" },
+    { "id": "issues", "label": "No — one or more have issues" }
+  ]
+}
+```
+
+- **yes** → Proceed to **end of Phase 1** below.
+- **issues** → Ask which server(s) have issues and help troubleshoot (check tokens in mcp.json, Docker status, etc.). Loop until all four are healthy, then proceed to **end of Phase 1**.
+
+### End of Phase 1 — Hand off to a new chat
+
+Once all four MCPs are green in settings:
+
+1. Write the marker file `.setup-phase1-complete` at the project root with the current date. This signals that token config is done but live verification is pending.
+2. Tell the user:
+
+```
+Phase 1 complete ✅ — tokens configured in .env, MCP servers visible in settings.
+
+MCP connections can only be tested in a new chat session.
+👉 Open a new chat and type: verify mcps
+
+The setup wizard will resume automatically from Step 4.
+```
+
+**Stop here.** Do not continue to Step 4 in this chat session.
+
+---
+
+## STEP 4 — Verify MCP Connections
+
+> **Entry point for new chat:** When the user types "verify mcps" (or similar) and `.setup-phase1-complete` exists, start here. Read `.env` to load the stored `ZEPHYR_PROJECT_KEY` and `POSTMAN_WORKSPACE_ID` values collected during Phase 1.
+
+Verify each MCP with a **real** call (not just listing tools). Use the project key and workspace ID collected in STEP 2.
+
+### Verification calls
+
+1. **Playwright** → `browser_navigate` to `https://example.com`, then `browser_snapshot`. Success = page content returned.
+2. **Jira** → `jira_get_user_profile` with `user_identifier: "currentUser"`. Success = profile details returned.
+3. **Zephyr** → `search_test_cases_by_folder` with the stored project key, `folder_path: "/"`, `max_results: 5`. Success = test cases returned.
+4. **Postman** → `getWorkspace` with the stored workspace ID. Success = workspace details returned.
+
+### Present results
+
+```
+MCP CHECK:
+  Playwright:  [✅ / ❌]  → [result or error]
+  Jira:        [✅ / ❌]  → [result or error]
+  Zephyr:      [✅ / ❌]  → [result or error]
+  Postman:     [✅ / ❌]  → [result or error]
+```
+
+Then ask using **AskQuestion**:
+
+```json
+{
+  "id": "mcp-verify-results",
+  "prompt": "Do the MCP verification results above look correct?",
+  "options": [
+    { "id": "yes",     "label": "Yes — all passed" },
+    { "id": "recheck", "label": "No — recheck after I fix something" }
+  ]
+}
+```
+
+If any MCP fails, diagnose using the error table below, show a one-liner fix, and loop until it passes.
+
+### Error diagnosis (internal reference)
+
+| Error pattern | Fix to tell the user |
+|---|---|
+| `ECONNREFUSED`, `Cannot connect to the Docker daemon` | Start Docker Desktop, then say "recheck". |
+| `401 Unauthorized`, `invalid credentials` | Regenerate your PAT/API key and update `.env` (and `mcp.json` headers for Postman). |
+| Placeholder token still in `.env` | Token was not replaced — open `.env` and paste the real value. |
+| Other | Show full error, ask user to investigate. |
+
+All four MCPs must pass before proceeding.
+
+**✅ Step 4 done → Immediately proceed to Step 5. Do NOT stop here.**
+
+---
+
+## STEP 5 — Disable Write Tools on Zephyr & Postman MCPs
+
+Tell the user:
+
+```
+Disable write tools on Zephyr and Postman MCPs (safety — read-only access is all the agent needs):
+
+  1. Cursor Settings → Tools & MCP
+  2. Expand "user-zephyr-server" → toggle OFF any create/update/delete tools
+     Keep enabled: get_test_case, get_test_execution, get_test_run, get_test_run_cases, search_test_cases_by_folder, search_test_runs
+  3. Expand "user-postman_mcp_server" → toggle OFF any create/update/delete tools
+     Keep enabled: getCollection, getCollections, getEnvironment, getEnvironments, getWorkspace, getWorkspaces, and other get/read tools
+```
+
+Then ask using **AskQuestion**:
+
+```json
+{
+  "id": "write-tools-disabled",
+  "prompt": "Have you disabled the write tools on Zephyr and Postman MCPs?",
+  "options": [
+    { "id": "done",      "label": "Yes — disabled" },
+    { "id": "need-help", "label": "Need help" }
+  ]
+}
+```
+
+Wait for confirmation, then proceed.
+
+**✅ Step 5 done → Immediately proceed to Step 6. Do NOT stop here.**
+
+---
+
+## STEP 6 — Environment File (.env)
+
+- If `.env` doesn't exist, create an empty one at the project root.
+- Verify `.env` is in `.gitignore` — add it if missing.
+- Tell the user: `.env ready — it will be populated later when validation runs need test data.`
+
+**✅ Step 6 done → Immediately proceed to Step 7. Do NOT stop here.**
+
+---
+
+## STEP 7 — Install Dependencies
+
+Run `npm install` if `node_modules/` doesn't exist. Show success or failure. If it fails, show the error and wait for the user to fix it.
+
+**✅ Step 7 done → Immediately proceed to Step 8. Do NOT stop here.**
+
+---
+
+## STEP 8 — Knowledge Base Setup
+
+Delegate to `04-knowledge-base-builder.mdc` to import test cases from Zephyr Scale. Return here after it completes.
+
+**✅ Step 8 done → Immediately proceed to Step 9. Do NOT stop here.**
+
+---
+
+## STEP 9 — Clean Up
+
+**Delete** `.setup-phase1-complete` — it is no longer needed once full setup is complete.
+
+**✅ Step 9 done → Immediately proceed to Step 10. Do NOT stop here.**
+
+---
+
+## STEP 10 — Final Summary & Handoff
+
+Show a short summary:
+
+```
+Setup complete ✅
+  MCP servers: all connected
+  Write tools: disabled on Zephyr & Postman
+  .env: ready
+  Dependencies: installed
+  Knowledge base: built
+
+You're all set! Open a new chat and give me a Jira ticket ID to start validating.
+Tip: to re-run this wizard, add @00-initial-setup.mdc to a new chat.
+```
+
+---
+
+## Guardrails
+
+- **NEVER ask for a Jira ticket ID during setup.** The agent is in setup mode until Step 10 is complete. Asking for a ticket before that means setup failed.
+- **NEVER fall back to `01-orchestrator.mdc` during setup.** The orchestrator does not apply until the setup wizard has exited with the Step 10 summary.
+- **After each step, proceed to the next step immediately.** Do not pause between steps. Do not ask "what would you like to do next?" — the answer is always "the next setup step."
+- **Every step is mandatory** — do not offer skip options. All MCPs must be connected, write tools must be disabled, dependencies must be installed, and the knowledge base must be built before setup is marked complete.
+- **Never skip MCP verification** — always attempt the probe calls. Loop until every MCP passes.
+- **Never invent credentials** — ask the user for every value. Do not fill in placeholder passwords.
+- **Never commit `.env`** — verify `.gitignore` includes it.
+- **One question at a time** — do not dump all setup questions in a single message. Guide step by step.
+- **Idempotent** — if the user re-runs the wizard, it should detect existing config (`.env`, `node_modules/`, `knowledge-base/`) and offer to keep or reconfigure rather than overwriting blindly.
+- **This file is constant** — the agent must never modify `00-initial-setup.mdc` during a validation run.

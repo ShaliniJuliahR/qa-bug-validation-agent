@@ -5,7 +5,9 @@ alwaysApply: false
 
 # UI Validation — Playwright MCP
 
-> **Primary flow:** `01-jira-orchestrator.mdc` — this file runs only for **Phase 3** when classification is **UI** or **Both**.
+> **Primary flow:** `01-orchestrator.mdc` — this file runs only for **Phase 3** when classification is **UI** or **Both**.
+
+**Browser automation:** Use **only** the **Playwright MCP** for navigation, clicks, fills, waits, scrolling, tabs/windows, and screenshots during UI validation. Do **not** use any other browser or embedded IDE browser MCP for these steps.
 
 ---
 
@@ -26,7 +28,7 @@ Based on the ticket's steps to reproduce and description, draft two things:
    Use these values only for **QA/staging** UI validation. **Do not** paste the password into Jira, chat summaries, or screenshots; refer to “signed in with configured QA account” when documenting.
    - **Checkout card payment (when the flow requires a card in an embedded payment frame):** Prefer `TRIMBLE_QA_PAYMENT_*` from `.env` if set (`TRIMBLE_QA_PAYMENT_CARD_NUMBER`, `TRIMBLE_QA_PAYMENT_CARD_EXP_MM`, `TRIMBLE_QA_PAYMENT_CARD_EXP_YYYY`, `TRIMBLE_QA_PAYMENT_CARD_CVC`, optional `TRIMBLE_QA_PAYMENT_NAME_ON_CARD`). If unset, use **processor-approved QA test PANs** only when your team allows it; otherwise ask the user once for test card details to store in `.env`. **Never** paste full card numbers or CVC into Jira or public chat—redact in evidence (e.g. “card ending 4242”).
 2. **If either variable is missing or empty** — Ask the user once for **email and password** (or confirm they will sign in manually and say when to continue). **Do not** invent credentials.
-3. **Include auth in the written plan** — When sign-in is expected, list an explicit step such as: *Sign in via Trimble Identity using QA credentials from env (or user-supplied)*, then continue repro steps.
+3. **Include auth in the written plan** — When sign-in is expected, list an explicit step such as: *Sign in via Trimble Identity using QA credentials from env (or user-supplied)*, then continue steps to reproduce.
 
 Present the plan to the user before taking any action:
 
@@ -46,18 +48,22 @@ Environment: [ENV Name + Base URL]
 📸 Screenshot / Validation Points:
   - After Step [N]: Capture [what should be visible — e.g., success state, error message, correct data]
   - After Step [N]: Capture [expected outcome or UI state]
-
-Choose:
-1. Proceed with this plan
-2. I will correct the plan (reply with changes)
 ```
+
+Then present the choice using the **`AskQuestion` tool**:
+
+- **id:** `ui-plan-confirm`
+- **prompt:** "Review the UI validation plan above. Proceed or correct?"
+- **options:**
+  - `proceed` — "Proceed with this plan"
+  - `correct` — "I will correct the plan (reply with changes)"
 
 ---
 
 ### Step 2: Await User Confirmation
 
-- If the user chooses **2** (or sends corrections without a number), update the checklist and re-present the full updated plan with the same **Choose:** block.
-- **Do not execute any browser action until the user chooses `1`** (or sends an unambiguous **CONFIRM** / **proceed** that maps to option 1).
+- If the user selects **correct** (or sends corrections), update the checklist and re-present the full updated plan with the same **`AskQuestion`** prompt.
+- **Do not execute any browser action until the user selects `proceed`** (or sends an unambiguous **CONFIRM** / **proceed**).
 
 ---
 
@@ -87,9 +93,9 @@ Execute each confirmed step in order using the following Playwright MCP tool cal
 
 **Naming convention for screenshots:**
 ```
-/screenshots/[JIRA_TICKET_ID]/step_[N]_[short_description].png
+/screenshots/[JIRA_TICKET_ID]/[short_description].png
 ```
-Example: `/screenshots/PROJ-412/step_5_error_message_visible.png`
+Example: `/screenshots/PROJ-412/error_message_visible.png`
 
 **Rules during execution:**
 - Execute steps sequentially — do not skip or reorder.
@@ -136,13 +142,14 @@ If a Playwright MCP error is encountered during any step:
    Impact:  [Steps that could not be completed as a result]
    ```
 3. Suggest a likely cause if identifiable (e.g., selector not found, page did not load, authentication failed).
-4. Ask how to proceed using a minimal numbered list. If the error prevented reaching a **validation point** where pass/fail is known, prioritize options that **unblock progress toward that point** (not only “skip” — skipping may leave the bug unjudged; say so if applicable):
-   ```
-   Choose:
-   1. Retry this step (I will adjust and retry)
-   2. Skip this step and continue
-   3. Abort UI validation
-   ```
+4. Ask how to proceed using the **`AskQuestion` tool**. If the error prevented reaching a **validation point** where pass/fail is known, prioritize options that **unblock progress toward that point** (not only “skip” — skipping may leave the bug unjudged; say so if applicable):
+
+   - **id:** `ui-step-error`
+   - **prompt:** “Step [N] failed. How would you like to proceed?”
+   - **options:**
+     - `retry` — “Retry this step (I will adjust and retry)”
+     - `skip` — “Skip this step and continue”
+     - `abort` — “Abort UI validation”
 
 > ⚠️ Also refer to `self-improvement-ui.mdc` — if the error was caused by a faulty guideline in this file, update that file accordingly after resolving the issue.
 
@@ -162,15 +169,15 @@ Environment: [ENV Name]
 ...
 
 📸 Screenshots Captured:
-  - /screenshots/[TICKET_ID]/step_3_landing_page.png
-  - /screenshots/[TICKET_ID]/step_5_error_state.png
+  - /screenshots/[TICKET_ID]/landing_page.png
+  - /screenshots/[TICKET_ID]/error_state.png
 
 Overall Result: PASS ✅ / FAIL ❌ / Incomplete — blocked (no pass-fail verdict) 🔶
 ```
 
 If the run ended **blocked** before a validation verdict, use **Incomplete — blocked** for overall result, list which evidence was missing, and return that summary to the orchestrator — **do not** draft Jira wording that claims the bug passed or failed until the user unblocks and validation completes.
 
-Return this result summary to `01-jira-orchestrator.mdc` for use in the Jira comment draft.
+Return this result summary to `01-orchestrator.mdc` for use in the Jira comment draft.
 
 ---
 
@@ -188,10 +195,11 @@ Return this result summary to `01-jira-orchestrator.mdc` for use in the Jira com
 
 ## Guardrails
 
-- Never generate Playwright scripts, test files, or code of any kind.
+- **Playwright MCP only** for live browser work — no alternate browser MCPs for navigation or interaction.
+- **Do not** generate Playwright spec code or automation scripts at any point.
 - Never begin browser actions before the user has confirmed the checklist.
 - Always create the screenshots folder before the first navigation step.
 - Always stop and report on failure — never silently skip a broken step.
 - If blocked before a validation verdict, ask the user how to resolve the block to reach that point; do not assert PASS/FAIL for the bug.
-- Screenshot filenames must be descriptive and include the step number.
+- Screenshot filenames must be descriptive (no step number prefix).
 - Limit steps to P1 validation scope only — do not expand without user instruction.

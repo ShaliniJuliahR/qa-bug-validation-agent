@@ -1,0 +1,141 @@
+---
+description: Jira MCP implementation rules — ticket fetching, steps-to-reproduce field extraction, transitions (including multi-step), comment posting, and attachment handling. Used by 01-orchestrator.mdc for all Jira interactions.
+alwaysApply: false
+---
+
+# Jira Rules — MCP Implementation Protocol
+
+This file contains all Jira-specific implementation details. The orchestrator (`01-orchestrator.mdc`) delegates here whenever it needs to read from or write to Jira.
+
+---
+
+## MCP discovery (run once per session)
+
+Before the first Jira call, discover exact tool names by reading the server's tool schemas under `mcps/<jira-server>/tools/`. Tool names differ by package — **never guess parameters**; use the schema.
+
+The current stack uses **`user-mcp-atlassian`** (Trimble Jira at `jira.trimble.tools`).
+
+---
+
+## Fetching a ticket (Steps to Reproduce)
+
+"Steps to reproduce" lives in **custom fields**, not just the description. **`jira_get_issue`** often returns a short summary and **omits** textarea custom fields. Do not rely on it alone.
+
+### Mandatory fetch pattern
+
+1. **Resolve field IDs** — Call **`jira_search_fields`** with keyword `reproduce` or `steps` (or `""` with a higher `limit` to scan). Use returned `id` values (e.g. `customfield_14210`) in step 2.
+2. **Load issue with those fields** — Call **`jira_search`** with:
+   - `jql`: `key = <ISSUE-KEY>`
+   - `fields`: `summary,description,customfield_14210,customfield_13602` (plus labels, components, priority as needed)
+   - `limit`: `1`
+   - `expand`: `renderedFields` (optional, for rendered HTML)
+3. **Read the value** — `issues[0].custom_fields.<id>.value`. **Precedence:** Steps to Reproduce → How To Reproduce → description.
+
+**Known field IDs (Trimble Jira — verify with `jira_search_fields` if empty):**
+
+| Field name | Typical ID |
+|---|---|
+| Steps to Reproduce | `customfield_14210` |
+| How To Reproduce | `customfield_13602` |
+
+Use **`jira_get_issue`** for a quick status/identity snapshot, but **always** complete ingestion with `jira_search` + explicit steps-to-reproduce field IDs.
+
+---
+
+## Transitions
+
+### Reading transitions
+
+Call **list transitions** for the issue to see allowed next statuses.
+
+### Performing a transition
+
+From the transitions list, pick the transition whose **to-status name** matches the target exactly (including spelling and spacing). Use the **transition issue** tool with the correct transition id/name per schema.
+
+### When `QA In Progress` is not available
+
+Stop, and present the available transitions using the **`AskQuestion` tool** — one option per available transition plus a skip option:
+
+- **id:** `jira-transition-pick`
+- **prompt:** "QA In Progress is not available. Which transition would you like?"
+- **options:** (dynamically generated from the transition list)
+  - One option per transition: `transition-<id>` — "[Transition name] → [Target status]"
+  - Final option: `skip` — "Skip — leave status unchanged"
+
+### Multi-step transitions
+
+Many workflows require **several hops** to reach Done / Closed / QA Complete. A single `list transitions` call only shows **legal next hops** from the **current** status.
+
+When the target status is not a direct transition:
+
+1. List transitions for the current issue.
+2. Note in the **Run plan** that a multi-step path is required.
+3. Execute forward:
+   - After each successful transition, **list transitions again** (status has changed).
+   - Choose the next transition that moves toward completion, avoiding loops.
+   - If several candidates are equally plausible, present them using the **`AskQuestion` tool** and get the user's pick.
+4. Stop when the issue's current status matches the target, or no forward transition remains — then list transitions and ask the user.
+5. Summarize: each step taken + final status. Update the Run plan under `Jira updates`.
+
+---
+
+## Order of operations (mandatory for every run)
+
+1. Load ticket (`jira_search` with steps-to-reproduce fields; optional `jira_get_issue` snapshot)
+2. List transitions
+3. Transition to `QA In Progress` (if available and agreed)
+4. *(Phase 3 validation — handled by orchestrator)*
+5. Post comment (after user CONFIRM)
+6. List transitions
+7. Final transition (only if user chooses)
+
+---
+
+## Posting a Jira comment
+
+After user confirms the draft (Phase 4 in the orchestrator):
+
+1. Call **`jira_add_comment`** with `issue_key` and `comment`.
+
+### Screenshot protocol
+
+Screenshots are **not** auto-attached via MCP. The user must attach them to the ticket manually.
+
+- The Jira comment must list **only the filenames** (no directory paths) of screenshots the user should attach, e.g.:
+  ```
+  Screenshots to attach:
+    - landing_page.png
+    - error_state.png
+  ```
+  **Do not** include the `screenshots/[TICKET_ID]/` path prefix in the Jira comment — filenames only.
+- In the chat (not the Jira comment), remind the user where the files are located locally (`screenshots/[TICKET_ID]/`) so they can find and upload them.
+- Do **not** call `jira_update_issue` with `attachments` — that path is unsupported.
+
+### Comment structure
+
+Every Jira comment must follow this four-part structure:
+
+1. **Validation** — 1–3 sentences tied to the bug's steps to reproduce, environment, and whether the issue reproduced.
+2. **Result bullets** — Pass ✅ / Fail ❌ for checks that map to acceptance criteria or steps to reproduce. Keep minimal.
+3. **Screenshots** — List exact filenames per the screenshot protocol above. The user will attach them manually.
+4. **Conclusion** — Single sentence: pass → "Fix validated and working as expected." / fail → state what is still observed.
+
+### Comment content rules
+
+- **No header block.** Do not start the comment with a report title, ticket ID, ticket title, or environment line. The reader already knows which ticket they are on — jump straight into the validation narrative. 
+- Short, ticket-focused.
+- No secrets, full card numbers, or passwords.
+- No step-by-step narration of unrelated flows.
+
+---
+
+## MCP failure handling
+
+If **any** Jira MCP call (get issue, search, list transitions, add comment, transition) returns an error, times out, or tools are unavailable:
+
+1. **Stop immediately.**
+2. Tell the user there is a **Jira MCP connectivity or configuration issue**.
+3. **Do not** post a comment, transition the issue, or use Jira to report the failure.
+4. **Do not** retry in a loop without user direction.
+5. Update the **Run plan** to reflect the failure.
+6. Do not proceed to validation phases as if Jira data were loaded — unless the user supplies ticket content **and** agrees to a paste-only path with **no Jira writes**.

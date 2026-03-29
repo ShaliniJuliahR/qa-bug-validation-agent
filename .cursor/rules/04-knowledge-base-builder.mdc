@@ -1,0 +1,273 @@
+---
+description: Builds or updates the knowledge base from Zephyr Scale test cases. Invoke when the user asks to create, rebuild, or refresh the knowledge base. Uses the Zephyr MCP (user-zephyr-server) to fetch test cases and produces structured Markdown files under knowledge-base/.
+alwaysApply: false
+---
+
+# Knowledge Base Builder — Zephyr Scale
+
+## Purpose
+
+This rule drives the creation **and** update of the project's `knowledge-base/` directory. The knowledge base is populated from **Zephyr Scale test cases** via the `user-zephyr-server` MCP. It serves as structured context for the QA Bug Validation Agent during UI and API validations.
+
+- **New user / first run:** Creates `knowledge-base/` from scratch.
+- **Returning user / refresh:** Detects an existing `knowledge-base/` and updates it — adds new test cases and refreshes changed content while preserving the file structure.
+
+---
+
+## When to invoke
+
+Trigger this rule when the user says any of: "build knowledge base", "create knowledge base", "update knowledge base", "refresh knowledge base", "sync test cases", or similar intent referencing Zephyr test cases and the knowledge base.
+
+---
+
+## Prerequisites
+
+- **Zephyr MCP** (`user-zephyr-server`) must be connected and responding.
+- The user must provide their **Zephyr project key** (e.g. `DVW`, `PROJ`).
+
+---
+
+## STEP 1 — Collect Project Key ID
+
+Ask the user for their **Zephyr project key id**:
+
+```
+To build your knowledge base I need your Zephyr project key id (e.g. projectId=36100).
+
+What is your project key ID? 
+It is avaialable in the test case page appended in the url (e.g. https://jira.trimble.tools/secure/Tests.jspa#/v2/testCases?projectId=36100)
+```
+
+Store it for all subsequent Zephyr MCP calls in this run.
+
+---
+
+## STEP 2 — Discover Folders and Fetch Test Cases
+
+### Zephyr MCP tools used
+
+| Tool | Server | Required params |
+|------|--------|-----------------|
+| `search_test_cases_by_folder` | `user-zephyr-server` | `project_key`, `folder_path` (start with `"/"`), optional `max_results` (default 100) |
+| `get_test_case` | `user-zephyr-server` | `test_case_key` (e.g. `PROJ-T123`) |
+
+### Crawl procedure
+
+1. Call `search_test_cases_by_folder` with `project_key` and `folder_path: "/"` and `max_results: 100`.
+2. From the response, collect all **test case keys** and note any **folder paths** returned.
+3. For each discovered folder, recursively call `search_test_cases_by_folder` with that folder path to find sub-folders and their test cases.
+4. Continue until all folders have been visited and no new sub-folders are discovered.
+5. For **every unique test case key** collected, call `get_test_case` to fetch full details: name, objective, preconditions, test steps (action + expected result), priority, labels, folder path, and status.
+6. Track totals: number of folders visited, number of test cases fetched.
+
+**Pagination:** If a folder returns exactly `max_results` items, increase `max_results` or note that truncation may have occurred — inform the user.
+
+**MCP failure:** If the Zephyr MCP errors or is unavailable at any point, **stop immediately**, tell the user there is a Zephyr MCP connectivity issue, and do not proceed.
+
+---
+
+## STEP 3 — Present Test Cases for User Confirmation
+
+Before any categorization, present the **complete list** of fetched test cases in a readable table:
+
+```
+Found [N] test cases across [M] folders in project [KEY]:
+
+| # | Key | Name | Folder | Priority |
+|---|-----|------|--------|----------|
+| 1 | PROJ-T101 | Login with valid credentials | /Authentication | P1 |
+| 2 | PROJ-T102 | Login with expired password | /Authentication | P2 |
+| ... | ... | ... | ... | ... |
+
+```
+
+Then present the choice using the **`AskQuestion` tool**:
+
+- **id:** `kb-testcases-confirm`
+- **prompt:** "Confirm the fetched test cases or adjust?"
+- **options:**
+  - `confirmed` — "Confirmed — proceed with these test cases"
+  - `missing` — "Some are missing — I will provide additional folder paths"
+  - `exclude` — "Some should be excluded — I will specify which to remove"
+
+- If the user selects **missing**, ask for additional folder paths and fetch those, then re-present.
+- If the user selects **exclude**, remove specified entries from the dataset, then re-present.
+- Only proceed to Step 4 after explicit **confirmed** selection (or equivalent confirmation).
+
+---
+
+## STEP 4 — Analyze and Categorize by Feature
+
+Group the confirmed test cases into **features**:
+
+1. **Primary grouping signal:** Zephyr folder path — folders typically mirror feature areas.
+2. **Secondary signals:** Test case name patterns, shared preconditions, overlapping steps, labels/components.
+3. **Merge similar folders** if they clearly cover the same feature (e.g. `/Checkout/Payment` and `/Checkout/Billing` could merge into "Checkout & Billing").
+4. **Split oversized groups** if a single feature would produce a file exceeding ~700 lines. When splitting, break along **meaningful sub-feature boundaries** — never use generic `part1`/`part2` naming. Each resulting file must represent a coherent, self-contained sub-feature (e.g. split "Checkout" into `checkout-cart.md` and `checkout-billing.md`).
+5. Produce a final **feature-to-test-case mapping** and present it to the user:
+
+```
+Proposed feature grouping:
+
+| Feature | File | Test Cases |
+|---------|------|------------|
+| Authentication | authentication.md | PROJ-T101, PROJ-T102, PROJ-T103 |
+| Product Catalog | product-catalog.md | PROJ-T201, PROJ-T202 |
+| ... | ... | ... |
+
+```
+
+Then present the choice using the **`AskQuestion` tool**:
+
+- **id:** `kb-grouping-confirm`
+- **prompt:** "Proceed with this feature grouping or adjust?"
+- **options:**
+  - `proceed` — "Looks good — build the knowledge base"
+  - `adjust` — "I want to adjust grouping (reply with changes)"
+
+Wait for confirmation before writing files.
+
+---
+
+## STEP 5 — Build the Knowledge Base Files
+
+### Directory
+
+Create `knowledge-base/` at the project root if it does not exist. If it already exists (update run), the agent will overwrite files for features that changed and remove files for features that no longer exist.
+
+### File naming
+
+`knowledge-base/<feature-slug>.md` — lowercase, hyphen-separated. Examples: `authentication.md`, `checkout-billing.md`, `product-catalog.md`.
+
+### File template
+
+Each feature file must follow this structure:
+
+```markdown
+# Feature: <Feature Name>
+
+## Overview
+
+<1-2 sentence description of what this feature area covers.>
+
+## Test Flows
+
+### <Flow Name> [<Priority>] (from <TC-KEY>)
+
+**Objective:** <What this test validates>
+
+**Preconditions:**
+- <Setup requirement 1>
+- <Setup requirement 2>
+
+**Steps:**
+1. <Action> → Expected: <Result>
+2. <Action> → Expected: <Result>
+...
+
+---
+
+### <Next Flow Name> [<Priority>] (from <TC-KEY>)
+...
+
+## Key Validations
+
+- <Critical check 1 across all flows in this feature>
+- <Critical check 2>
+
+## Common Preconditions
+
+- <Shared setup that applies to multiple flows in this feature>
+```
+
+### Content rules
+
+- **Max 700 lines per file.** If exceeded, split by sub-feature with meaningful names.
+- **Logical ordering within each file:** setup/prerequisite flows first, then happy-path flows, then edge cases, then error/negative flows.
+- **Steps must be concrete and actionable** — the agent reads these during live validation to know exactly what to do and what to expect.
+- **Strip Zephyr-internal metadata** that adds no validation value (internal numeric IDs, audit timestamps, execution history).
+- **Preserve priority** (P1/P2/P3) on each flow so the agent can prioritize during validation per `01-orchestrator.mdc` principles.
+- **Include the Zephyr test case key** (e.g. `PROJ-T123`) in each flow heading for traceability.
+
+---
+
+## STEP 6 — Create the Knowledge Base Index
+
+Write `knowledge-base/_index.md`:
+
+```markdown
+# Knowledge Base Index
+
+> Auto-generated from Zephyr Scale project [PROJECT_KEY]. Last updated: [DATE].
+
+| Feature | File | Test Cases | Description |
+|---------|------|------------|-------------|
+| Authentication | [authentication.md](authentication.md) | PROJ-T101, PROJ-T102, PROJ-T103 | Login, logout, SSO, password flows |
+| Product Catalog | [product-catalog.md](product-catalog.md) | PROJ-T201, PROJ-T202 | Browse, search, filter products |
+| ... | ... | ... | ... |
+
+**Total:** [N] test cases across [M] feature files.
+```
+
+---
+
+## STEP 7 — Wire into the Orchestrator (first run only)
+
+On the **first** knowledge-base build (i.e. `knowledge-base/` did not previously exist), add the following block to `01-orchestrator.mdc` in the **Phase 2 — Classification** section, immediately after the classification table:
+
+```
+### Knowledge base lookup
+
+After classification, scan `knowledge-base/_index.md` to find feature files relevant to the ticket (match on keywords from ticket title, description, labels, or components). Load matching feature files as context before starting Phase 3. This provides the agent with pre-existing test flows, expected behaviors, and key validations to compare against the bug's steps to reproduce during validation.
+```
+
+On **update** runs (knowledge base already existed), **skip this step** — the orchestrator reference is already in place.
+
+---
+
+## STEP 8 — Summary
+
+After all files are written, present a summary:
+
+```
+Knowledge base [created / updated] successfully.
+
+  Directory:    knowledge-base/
+  Feature files: [N] files
+  Test cases:    [M] total
+  Index:         knowledge-base/_index.md
+
+Files written:
+  - knowledge-base/_index.md
+  - knowledge-base/authentication.md (X test flows)
+  - knowledge-base/product-catalog.md (Y test flows)
+  - ...
+
+The agent will now consult these files during validation runs via the
+knowledge base lookup added to 01-orchestrator.mdc Phase 2.
+```
+
+---
+
+## Update mode (existing knowledge base)
+
+When `knowledge-base/` and `knowledge-base/_index.md` already exist:
+
+1. Follow Steps 1–3 as normal (fetch fresh data from Zephyr, present to user).
+2. In Step 5, **compare** the new dataset against existing files:
+   - **New test cases** not in any existing file → add to the appropriate feature file (or create a new feature file).
+   - **Removed test cases** (in existing files but no longer in Zephyr) → remove from the feature file. If a feature file becomes empty, delete it.
+   - **Changed test cases** (name, steps, priority differ) → update in place.
+3. Re-generate `_index.md` with the updated mapping.
+4. Skip Step 7 (orchestrator already wired).
+5. In the summary, note what changed: added, removed, updated counts.
+
+---
+
+## Guardrails
+
+- **User confirmation at every gate:** Never proceed past Step 3 or Step 4 without explicit user approval.
+- **No fabricated test data:** Only write test flows that came from the Zephyr MCP response. Do not invent steps or expected results.
+- **MCP failure = stop:** If the Zephyr MCP fails at any point, stop, inform the user, and do not write partial knowledge base files.
+- **No secrets in knowledge base files:** Do not include credentials, tokens, or API keys. Reference environment variable names if auth is part of a flow.
+- **File size discipline:** Check line counts before writing. If a file would exceed 700 lines, split by sub-feature before writing.
