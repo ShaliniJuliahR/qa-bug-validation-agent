@@ -216,7 +216,16 @@ Collect structured results (pass/fail, evidence, screenshot paths) and return he
 
 ### Step 4 — Self-Improvement (Record Learnings)
 
-After validation completes (or after resolving any trial-and-error during validation), check whether any learnings should be recorded.
+After validation completes (or after resolving any trial-and-error during validation), **always** run through the checklist below before proceeding to Step 5. Do not skip this step.
+
+#### Self-improvement checklist (mandatory)
+
+- [ ] **Review:** Did the agent retry any action, get an unexpected error, or change approach during Step 3?
+- [ ] **Identify:** List each trial-and-error instance (wrong payload, wrong URL, wrong selector, auth failure, etc.).
+- [ ] **Record:** For each instance, append an entry to the appropriate self-improvement file **now** — before drafting the Jira comment.
+- [ ] **Verify:** Confirm the entry was written by re-reading the self-improvement file.
+
+If **none** of the above apply (zero retries, zero unexpected errors), explicitly state: *"No self-improvement entries needed — validation completed without trial-and-error."*
 
 #### When to record
 

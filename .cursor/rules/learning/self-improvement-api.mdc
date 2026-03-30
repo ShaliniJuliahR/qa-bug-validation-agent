@@ -62,6 +62,24 @@ On API error during validation:
 
 ---
 
+### 2026-03-30 — Create Account Organization requires full businessInfo fields
+
+- **When:** POST `/api/accounts-service/v1/accounts` with `accountType: "Organization"`.
+- **Failed:** Payload with only `businessInfo.companyName` → 400 ACCOUNTS_1072 "BusinessInfo values are missing or invalid".
+- **Required fields:** `companyName`, `companySize`, `country`, `taxExemptionType`, `VatId` (found in `axp-com-middleware-apis` collection → `create_account QA`).
+- **Workaround:** For Individual accounts, omit `businessInfo` entirely — 201 success.
+
+---
+
+### 2026-03-30 — Create Account / Create Cart correct Postman collection
+
+- **When:** Looking for commerce Create Account or Create Cart endpoints.
+- **Not in:** "AX APIs" collection (profiles-only Create Account, different API).
+- **Found in:** `axp-com-middleware-apis` collection (uid `28186886-adf07d13-...`) → folder `01_user-accounts-service` → `create_account QA` / `create_account ORG`.
+- **Cart:** "AX APIs" → `Products Service` → `CreateCart` uses `{{base_url_products}}/carts`. QA URL = `https://qa.shop.trimble.com/api/products-service/v1/carts`.
+
+---
+
 ## When NOT to Write a Correction
 
 Skip if failure was: transient network/env issue, user-input error, or already-logged MCP limitation.
