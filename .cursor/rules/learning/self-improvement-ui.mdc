@@ -72,6 +72,30 @@ Read this section **before** interacting with similar pages so past trial-and-er
 
 ---
 
+### 2026-03-30 — Address Doctor popup blocks account setup with test addresses
+
+- **Site:** `qa.shop.trimble.com` `/account-setup` — Account Address step.
+- **Failed:** Fake/test addresses ("123 Test Street, Austin, TX 78701") trigger Address Doctor "no match" or "review suggested" popups, blocking form submit.
+- **Worked:** Accept Address Doctor's recommended address, or use a known real address (e.g. 935 Stewart Dr, Sunnyvale, CA 94085).
+- **Sequence:** Fill address → if Address Doctor popup appears → click "Accept" for recommended address or "Edit this address" to correct → re-submit.
+
+---
+
+### 2026-03-30 — Cybersource payment iframe: access via #myIframe contentFrame
+
+- **Site:** `qa.shop.trimble.com` `/checkout` — Payment Method → Credit or Debit Card.
+- **Iframe:** Payment form is inside `#myIframe`. Access fields via `page.locator('#myIframe').contentFrame()`.
+- **Fields:** `getByRole('radio', { name: 'Visa' })`, `getByRole('textbox', { name: 'Card Number' })`, `getByRole('combobox', { name: 'Expiration Month' }).selectOption('01')`, `getByRole('combobox', { name: 'Expiration Year' }).selectOption('2028')`, `getByRole('textbox', { name: 'CVN' })`.
+- **Submit:** `getByRole('button', { name: 'Submit' })` inside iframe. Billing info "Save" button has `data-testid="address-primary-btn"`.
+
+### 2026-03-30 — Screenshots saved to project root instead of screenshots/TICKET_ID/
+
+- **Error:** `browser_take_screenshot` calls during recovery/troubleshooting used bare filenames (e.g. `checkout_company_name_visible.png`), saving to project root instead of `screenshots/DVW-4736/`.
+- **Root Cause:** Only the final "evidence" screenshots used the full relative path; intermediate or retry screenshots omitted the folder prefix.
+- **Fix:** **Always** pass `filename: "screenshots/[TICKET_ID]/[name].png"` for every `browser_take_screenshot` call — including retries, debug captures, and recovery steps. After validation completes, verify no `.png` files exist in the project root.
+
+---
+
 ## When NOT to Write a Correction
 
 Skip if failure was: transient network/env issue, user-input error, or already-logged MCP limitation.
